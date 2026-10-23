@@ -1,0 +1,4 @@
+flowchart TD
+  OUTCOME["OUTCOME LOCKED<br/>Win or defeat"] --> SETTLE["SETTLE ANIMATIONS<br/>Input and AI stop"]
+  SETTLE -->|900 ms + settled|POPUP["RESULT POPUP<br/>Win or defeat text"]
+  POPUP -->|1600 ms|SCORE["SCORE VIEW<br/>Record result once"]

@@ -1,0 +1,6 @@
+flowchart TD
+  INPUT["InputService<br/>Input intent"] --> GAME["KuradiSaased.update<br/>Fixed 120 Hz steps"]
+  GAME --> COMBAT["CombatLogicService<br/>Motion / FSM / hits"]
+  COMBAT --> MODEL["FighterModel<br/>State + stateTime"]
+  MODEL --> HANDLER["FighterAnimationHandler<br/>Select matching pose"]
+  HANDLER --> ENTITY["FighterEntity.render<br/>Draw sprite + elevation"]

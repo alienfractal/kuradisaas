@@ -1,0 +1,6 @@
+flowchart TD
+  READY["IDLE / WALKING"] -->|E or R|STARTUP["STARTUP<br/>Attack windup"]
+  STARTUP -->|Spec startup|ACTIVE["ACTIVE<br/>May deal damage"]
+  ACTIVE -->|Spec active|RECOVERY["RECOVERY<br/>Movement locked"]
+  RECOVERY -->|Full recovery|READY
+  RECOVERY -->|Valid R follow-up|STARTUP

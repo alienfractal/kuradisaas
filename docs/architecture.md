@@ -1,0 +1,250 @@
+# Kuradi Sääsed architecture
+
+## Relationship to the reference projects
+
+RevaliaObscura supplies the organizing pattern: a Flame game as composition root,
+a game-level FSM, worlds for screens/scenarios, models for data, services for
+rules and cached assets, entities for presentation, and animation handlers.
+The inspected CoolorBurn checkout contains its card-game implementation. No
+historical fighting implementation was recovered or copied.
+
+This is a fresh implementation of those patterns, rather than a copy of the
+adventure game. It has no dialogue, quest, board, or turn dependencies. There are
+no static shared state instances; a restart creates a fresh simulation and world.
+
+## Ownership and data flow
+
+```
+Keyboard / touch
+      |
+ InputService (direction + punch/kick/jump intent)
+      |
+ KuradiSaased.update: fixed 120 Hz simulation
+      |
+ CombatLogicService -> FighterModel + AttackSpec
+      |                       |
+ ArenaView               FighterAnimationHandler
+      |                       |
+ FighterEntity <---- FighterCacheService (preloaded original PNGs)
+
+ GlobalGameFsm -> menu / loading / level / pause / score / end
+      |
+ Separate Flame World views + Flame ArenaHud
+ (Flutter overlay: touch controls and focus handling only)
+```
+
+`CombatLogicService` has no Flutter or Flame imports. The simulation owns damage,
+movement, facing, knockback, invulnerability, and state transitions. Entity and
+animation code only read these results. Animation callbacks never unlock a
+fighter, deal damage, or advance a combat phase.
+
+## Global game lifecycle
+
+`GlobalGameState` and `GlobalGameFsm` own the application flow, separate from every
+fighter's `FighterState`. Boot preloads shared sprites and opens Main Menu.
+Starting a run resets `CampaignModel`, enters Loading, constructs the configured
+arena off-camera, and waits for Flame's component tree to load and mount before
+entering Level. `LoadingView` stays the camera's visible world during that work.
+Loading errors return to Menu with an error message.
+
+`GlobalGameFsm` calls its entry handler after a valid transition. That handler
+selects a separate Flame `World`: `MainMenuView`, `LoadingView`, `ArenaView`,
+`GameScoreView`, `GameEndView`, or `PauseView`. `switchToWorld` attaches the selected
+world to the camera and resets its screen coordinates. Menu/Score/Loading/End
+are independent views, not branches in a single Flutter widget. They use shared
+Flame text and tap-button primitives in `ScreenView`; each owns its own contents.
+The Flutter `GameControlsOverlay` is limited to touch controls and focus handling.
+Pause holds the current arena instance and resumes it with the same fighter data
+and camera position. Other screens remove the old arena.
+
+Level completion or defeat latches one immutable `LevelResult` in `LevelEndingModel`.
+The existing arena stays active while current animations settle, with new input,
+AI and damage disabled. After at least .9s and all motion/phases/deaths finish,
+a result popup stays for 1.6s before recording the result and entering Score.
+The simulation freezes while the player reviews the breakdown and running total.
+Continuing from a cleared level enters Loading for the next level if one exists;
+otherwise it enters End. Defeat also leads from Score to End. End returns to Menu.
+Pause resumes the same level, or abandons it to Menu without recording a result.
+
+Two street encounters (five and seven mosquitoes) exercise this full flow.
+Definitions live in `CampaignModel`; each receives a fresh arena and full player
+health. Scores survive world replacement, but reset when starting a new run.
+Scoring is 10 per landed attack, 100 per defeated mosquito, and 25 per remaining health
+point on a clear. `recordResult` refuses duplicate accounting for a level.
+
+The full flow has a widget test using real sprite loading and Flame world mounts,
+including next level, pause, victory, defeat, End, Menu, and run reset.
+
+## Fighter lifecycle
+
+```
+idle <-> walking
+  |         |
+  +--- startup -> active -> recovery -> idle
+          |         |          |
+          +---------+---------- hurt -> idle
+                                |
+                     lethal damage -> dead
+```
+
+Idle/walking can start an attack; a confirmed kick combo can also transition
+from its explicitly permitted recovery window. Attack direction is locked until recovery
+finishes. Hurt cancels the current attack and input buffer. Dead is terminal.
+The next attack can be buffered for 160 ms during recovery. Keyboard repeats do
+not queue attacks; tapping E/PUNCH, R/KICK, or Space/JUMP creates one matching intent.
+
+Punch: 90 ms startup, 75 ms active, 190 ms recovery. Mosquito sting: 300 ms
+startup, 100 ms active, 450 ms recovery. Change `AttackSpec` to tune these values.
+The mosquito's magenta warning appears during startup. Flight art is used for movement and sting. Hurt plays the new five-frame recoil
+once in .25s, then holds its final pose during extended stun/launch. Dead plays
+the seven-frame burst once over .56s, with no blinking or squash. These are read
+from stateTime; finishing a sheet never changes combat. The final enemy's death
+window completes before the ending popup (`endingAnimationsFinished`); `won`
+still means every enemy has zero health. Both win and defeat use the same
+settlement/popup flow before Score.
+
+An attack can hit multiple opponents, once each. Range is checked in front of
+the attacker, and feet must be within a 10-pixel depth band. Visual overlap alone
+does not cause damage. Player attacks resolve first on simultaneous contact.
+Hits interrupt opponents and add short invulnerability. There is no body
+separation yet, so enemies can overlap during a swarm.
+
+## Space and time
+
+Gameplay uses a 256×128 logical view of a 640×320 street map. The camera follows
+Jaan in both axes and clamps to the map. Feet remain in the 236–310 depth band;
+ground Y still controls drawing order. Black sky, three animated star frames,
+and a static street layer render behind fighters. Distant stars scroll more
+slowly than the street. Camera and sprite positions are rounded to pixels and
+nearest-neighbor sampling is used. The viewport uses integer physical-pixel
+scaling and letterboxes spare space. Other global screens retain 320×200 layouts.
+
+The game uses an accumulator with 1/120-second simulation steps, and accepts at
+most 100 ms per rendered frame. Excess long-frame time is discarded to prevent
+unbounded catch-up. Pause clears input and accumulated time; focus/lifecycle loss
+pauses a running session. Presentation is frozen outside play.
+
+## Adding the next feature
+
+- **Scenery:** add background/foreground components in `ArenaView`. Keep movement
+  bounds in `ArenaConfig`, independent of painted scenery.
+- **More enemies:** move spawn definitions out of the service constructor into
+  scenario data; give AI its own service when there is more than one behavior.
+- **More levels:** create scenario configuration and a loader like Revalia's,
+  preserving the same combat service and actor components.
+
+## Boundaries of this first slice
+
+Two street encounters, punch, jump, three-stage kick combo, keyboard/touch controls, health,
+pause/resume, cumulative scoring, and the global Menu/Loading/Level/Score/End flow.
+There is no save data, mobile packaging, or controller support yet.
+Web is the generated runner. Flutter/Flame code can be reused for desktop/mobile
+when those platform runners are added and tested.
+
+
+
+
+## Jump motion and attack selection
+
+Jump elevation/velocity are separate from ground x/y and the attack FSM.
+The fixed simulation step applies gravity, determines landing, and checks attack
+height tolerance. Rendering lifts only the sprite; the shadow and depth lane
+stay on the street. Jump art follows simulated jump time, not a completion callback.
+Punch and kick use the same startup/active/recovery states with different immutable
+AttackSpec values. A buffered intent chooses the next attack after recovery, except for a confirmed
+kick follow-up in its permitted recovery window. Jumping cannot bypass recovery.
+
+
+## Hit-confirmed kick combo
+
+Kick contact retains the original center-distance rule, with a modest range
+reduction from 38/42/46px to 34/38/42px. Knockback stays at its original
+12/5/3px. Regression checks require the full combo to connect from normal
+23-25px enemy engagement spacing in both directions without player movement.
+
+
+`AttackKind` distinguishes front, high and very-high kicks without duplicating the
+startup/active/recovery FSM. `AttackSpec` stores timing, damage, knockback,
+launch speed, stun duration and the earliest permitted combo recovery time.
+
+R queues a kick intent. `CombatLogicService._beginPlayerAttack` resolves it to
+front, or to the confirmed next stage. `_hit` confirms a surviving target for
+0.42 seconds; the next stage must hit that same target to advance again. The
+confirmation is consumed when the follow-up starts, so missing cannot reuse it.
+Timeout, taking damage, or starting another kind of attack clears the chain.
+A single buffered press cannot queue multiple stages. Follow-ups require a fresh
+R press near contact/recovery (input buffer 0.16 seconds).
+
+Front/high/very-high deal 1/2/3 damage. Front pushes 12px; high pushes 5px and
+launches at 130px/s; the critical finisher pushes 3px and launches at 200px/s.
+High stuns for .70s, very-high for 1.2s. Launched victims remain hurt until both
+the stun expires and they land. The runtime defaults to 6-health mosquitoes.
+
+`FighterCacheService` slices the three named sheets using their filename metadata.
+`FighterAnimationHandler` maps startup, active and recovery to explicit poses:
+front impacts at frame 2; high and very-high impact at frame 1 (zero-based).
+Animation completion never changes the FSM or confirms a hit. Launch rendering
+lifts the sprite and health indicators while leaving shadow and depth order on
+the ground. A white pixel star marks a surviving critical victim's stun.
+
+## Player death and ending popup
+
+`jann_death_24x24-7.png` is sliced into seven 24x24 frames (case-insensitive
+filename metadata). Jaan's dead state reads its own .84s duration, renders at
+native 24x24 game pixels, and holds the final lying pose. Invulnerability blinking and
+the former squashed sprite are disabled for death.
+`jann_death-wound_24x24-7.png` uses the same layout and timing. On entering Dead,
+the model chooses fall/wound with equal probability once; rendering reads that
+stored choice throughout the sequence. The model accepts a seeded random source
+for deterministic tests. Walking audio uses a separate 1.3x playback rate, retained
+on gesture retries; applying that rate cannot revive a stopped channel.
+
+`LevelEndingModel` phases: playing -> finishing -> popup -> complete. The first
+outcome is captured once. Combat settlement advances gravity, hurt and attack
+phases, and death time; it never starts new actions, AI movement or damage. After
+at least .9s and all fighters settle, `LevelResultPopup` draws YOU WON! or JAAN IS
+DOWN for 1.6s above the gameplay viewport. The arena then transitions to Score.
+The existing Score -> Loading/End flow remains. Pause freezes the ending;
+loading a fresh level resets the model and restores controls. No delayed
+callbacks or animation completion handlers decide these transitions.
+
+## Audio events
+
+`CombatLogicService` emits `CombatEvent` facts for accepted jump takeoff, player
+attack start and actual contact. `KuradiSaased.update` forwards each step's events
+to `GameAudioService` immediately, including when multiple simulation steps happen
+in one rendered frame. The service observes ground movement for a separate walk
+loop; it does not mutate fighters. Sound completion never advances combat.
+
+`GameAudioPlayer` is adapted from CoolorBurn's tested `flame_audio_player.dart`,
+retaining pool initialization/start timeouts, retiring failed pools, direct SFX
+fallback, and late-player cleanup. It owns its cache and players per game instance.
+Logo and Lore share a music channel; footsteps have a separate looping channel.
+Generation checks cancel stale music/walk/SFX starts after screen changes.
+Tests explicitly inject `SilentAudioPlayer` or a recording fake so they do not
+access the real audio platform. See `docs/audio.md`.
+
+## Shared settings UI and CRT
+
+`GameSettings` holds per-instance SFX/music indices and the CRT flag. The four
+volume steps map directly to the shared 4-frame sheets. `SettingsControls` is
+reused by MainMenuView and PauseView. The original orange volume art and animated
+CRT sheet are copied unchanged from CoolorBurn. No delayed tap callbacks are used.
+`SettingsCacheService` converts these sheets once on load through `CgaPalette`
+and owns the converted images until disposal. The HUD and controls share its
+black/cyan/magenta/white constants. Touch fills are opaque and direction/pause
+glyphs use integer pixel rectangles; empty health cells have cyan outlines.
+
+Volume callbacks update the real audio backend: music/walking channel gains
+change in place, including a pending start. SFX changes stop short voices and
+invalidate pending effects, then later requests use the new gain. Settings survive
+world and campaign replacement but are not persisted across app restarts.
+
+`CrtRenderer` loads `resources/shaders/crt.frag`, adapted from CoolorBurn's
+`test.frag` using FlutterFragCoord for portable local coordinates. Enabled rendering
+captures `super.render` exactly once, applies the shader and releases obsolete
+images/pictures. Disabled rendering bypasses capture/shader completely. It affects
+Flame worlds/HUD, not Flutter touch widgets. The shader is off by default; camera
+viewport sizing and hit testing are unchanged. Headless rendering checks verify
+shader loading, a changed output pixel, single capture, and identical restored
+output when toggled off.

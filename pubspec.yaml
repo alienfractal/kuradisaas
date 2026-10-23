@@ -1,0 +1,29 @@
+name: kuradi_saased
+description: A low resolution CGA karate brawler built with Flutter and Flame.
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flame: 1.23.0
+  # Same tested versions as the newer CoolorBurn audio player.
+  flame_audio: 2.10.3
+  audioplayers: 6.1.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    # Includes scenery, fighters, menu/lore art and shared settings icon sheets.
+    - resources/images/
+    - resources/sound/
+  shaders:
+    - resources/shaders/crt.frag
+  fonts:
+    - family: Arcade
+      fonts:
+        - asset: resources/fonts/PressStart2P-Regular.ttf

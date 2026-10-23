@@ -1,0 +1,5 @@
+flowchart TD
+  ACTIVE["ATTACKER ACTIVE"] -->|Test target|CHECK["Facing / range / lane<br/>Height / vulnerability"]
+  CHECK -->|All checks pass|DAMAGE["APPLY DAMAGE<br/>Push / launch / stun"]
+  DAMAGE --> REACTION["HURT if still alive<br/>DEAD if health zero"]
+  REACTION --> RULES["HURT: stun + landing<br/>DEAD: never recovers"]

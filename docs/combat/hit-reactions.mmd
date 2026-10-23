@@ -1,0 +1,7 @@
+flowchart TD
+  ACTIVE["ATTACKER ACTIVE"] -->|Test target|CHECK["Facing / range / lane<br/>Height / vulnerability"]
+  CHECK -->|All checks pass|DAMAGE["APPLY DAMAGE<br/>Push / launch / stun"]
+  DAMAGE -->|Health remains|HURT["HURT<br/>Attack interrupted"]
+  DAMAGE -->|Health is zero|DEAD["DEAD<br/>Terminal state"]
+  HURT -->|Stun over + landed|READY["IDLE<br/>Can act again"]
+  DEAD -->|Mosquito / 560 ms|HIDDEN["BURST FINISHED<br/>Hide mosquito"]

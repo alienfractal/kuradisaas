@@ -1,0 +1,4 @@
+flowchart TD
+  SPACE["SPACE REQUEST"] -->|Idle or walking|TAKEOFF["NOT AIRBORNE?<br/>Start jump if yes"]
+  TAKEOFF -->|135 px/s upward|AIR["ELEVATION + VELOCITY<br/>Separate from FSM"]
+  AIR -->|Gravity each step|LAND["ELEVATION ZERO<br/>Clamp to ground"]
