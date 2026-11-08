@@ -1,3 +1,5 @@
+import 'package:kuradi_saased/gen/fonts.gen.dart';
+import 'package:kuradi_saased/gen/assets.gen.dart';
 // Run manually with: flutter test tool/render_street_preview.dart
 // Headless visual check; no GameWidget, browser, or server is started.
 import 'dart:io';
@@ -18,9 +20,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test('street viewport and original sprite sheets render headlessly',
       () async {
-    await (FontLoader('Arcade')
+    await (FontLoader(FontFamily.arcade)
           ..addFont(
-              rootBundle.load('resources/fonts/PressStart2P-Regular.ttf')))
+              rootBundle.load(Assets.resources.fonts.pressStart2PRegular)))
         .load();
     final game = KuradiSaased(audioPlayer: SilentAudioPlayer());
     game.onGameResize(Vector2(1024, 512));
@@ -33,6 +35,8 @@ void main() {
     game.update(GameMenuFsm.logoDuration);
     await game.ready();
     Future<void> snapshot(String name) async {
+      // Apply pending world/camera component transforms before a manual render.
+      game.update(0);
       final recorder = ui.PictureRecorder();
       game.render(ui.Canvas(recorder));
       final picture = recorder.endRecording();
@@ -77,7 +81,8 @@ void main() {
     expect(game.camera.viewport.virtualSize, Vector2(256, 128));
     expect(game.scenarioCache.stars, hasLength(3));
     expect(game.scenarioCache.stars.first.srcPosition.x, 640);
-    final presentation = FighterAnimationHandler(game.spriteCache);
+    final mosquitoPresentation = MosquitoAnimationHandler(game.spriteCache);
+    final presentation = PlayerAnimationHandler(game.spriteCache);
     for (final (frames, width, height, count) in [
       (game.spriteCache.idle, 80, 99, 4),
       (game.spriteCache.walk, 92, 99, 8),
@@ -97,8 +102,9 @@ void main() {
             game.combat.player, game.spriteCache.idle.first),
         Vector2(20, 25));
     expect(
-        presentation.displaySize(
-            game.combat.enemies.first, game.spriteCache.mosquito.first),
+        mosquitoPresentation.displaySize(
+            game.combat.enemies.whereType<MosquitoModel>().first,
+            game.spriteCache.mosquito.first),
         Vector2(32, 32));
     final scenery = game.world.children.whereType<StreetScenery>().single;
     final firstFrame = scenery.stars.animationTicker!.currentIndex;
@@ -146,7 +152,7 @@ void main() {
         _ => game.spriteCache.veryHighKick,
       };
       final low = spec == AttackSpec.frontKick;
-      expect(frames.length, low ? 5 : 7);
+      expect(frames.length, low ? 6 : 7);
       game.combat.player
         ..attack = spec
         ..enter(FighterState.active);
@@ -162,7 +168,7 @@ void main() {
           spec.startup,
           low ? [0, 1, 2, 3] : [0, 1, 2, 3, 4]
         ),
-        (FighterState.active, spec.active, low ? [4] : [5, 6]),
+        (FighterState.active, spec.active, low ? [4, 5] : [5, 6]),
         (
           FighterState.recovery,
           spec.recovery,
@@ -181,7 +187,7 @@ void main() {
       ..enter(FighterState.idle)
       ..elevation = 0
       ..verticalVelocity = 0;
-    final victim = game.combat.enemies.first
+    final victim = game.combat.enemies.whereType<MosquitoModel>().first
       ..x = 350
       ..y = 273
       ..enter(FighterState.hurt)
@@ -190,19 +196,20 @@ void main() {
       ..lastHitCritical = true
       ..invulnerability = .2;
     game.update(0);
-    expect(
-        presentation.frame(victim, 0), same(game.spriteCache.mosquitoHit[2]));
+    expect(mosquitoPresentation.frame(victim, 0),
+        same(game.spriteCache.mosquitoHit[2]));
     await snapshot('street-preview-mosquito-hit');
     victim
       ..health = 0
       ..enter(FighterState.dead)
       ..stateTime = .20;
-    expect(
-        presentation.frame(victim, 0), same(game.spriteCache.mosquitoDead[2]));
+    expect(mosquitoPresentation.frame(victim, 0),
+        same(game.spriteCache.mosquitoDead[2]));
     await snapshot('street-preview-mosquito-dead');
     game.togglePause();
     await game.ready();
     expect(game.camera.viewport.virtualSize, Vector2(320, 200));
+    await snapshot('sprite-buttons-pause');
     game.togglePause();
     await game.ready();
     expect(game.camera.viewport.virtualSize, Vector2(256, 128));
@@ -229,6 +236,8 @@ void main() {
       game.update(.1);
     }
     expect(game.fsm.phase, GlobalGameState.score);
+    await game.ready();
+    await snapshot('sprite-buttons-score');
     await game.continueFromScore();
     await game.ready();
     expect(game.levelEnding.active, isFalse);
@@ -254,6 +263,13 @@ void main() {
     }
     expect(game.levelEnding.showPopup, isTrue);
     await snapshot('street-preview-jaan-is-down');
+    for (var i = 0; i < 17; i++) {
+      game.update(.1);
+    }
+    expect(game.fsm.phase, GlobalGameState.score);
+    await game.continueFromScore();
+    await game.ready();
+    await snapshot('sprite-buttons-end');
     game.removeAll(game.children.toList());
     await game.ready();
     game.onDispose();

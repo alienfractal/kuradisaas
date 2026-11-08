@@ -161,8 +161,8 @@
       <thead><tr><th>Kick</th><th>Push</th><th>Upward launch</th><th>Victim stun</th></tr></thead>
       <tbody>
         <tr><td>Front</td><td>12 px</td><td>None</td><td>250 ms</td></tr>
-        <tr><td>High</td><td>5 px</td><td>130 px/s</td><td>700 ms, and until landed</td></tr>
-        <tr><td>Very high</td><td>3 px</td><td>200 px/s</td><td>1200 ms, and until landed</td></tr>
+        <tr><td>High</td><td>5 px</td><td>90 px/s</td><td>700 ms, and until landed</td></tr>
+        <tr><td>Very high</td><td>3 px</td><td>120 px/s</td><td>1200 ms, and until landed</td></tr>
       </tbody>
     </table></div>
     <p>Mosquitoes have 6 health by default: the full 1 + 2 + 3 chain kills one. A surviving critical victim shows a white stun marker. A swing may hit multiple enemies, but the chain tracks the first surviving victim hit.</p>
@@ -184,8 +184,9 @@
   REACTION --&gt; RULES[&quot;HURT: stun + landing&lt;br/&gt;DEAD: never recovers&quot;]
 </pre></details>
     <p><code>CombatLogicService._canHit</code> decides contact, not sprite overlap or an animation event. The target must be alive, not invulnerable, not already hit by this swing, in front and within reach, within 10 px of the attacker's ground lane, and inside the attack's height tolerance. Failed checks cause no damage; contact can still succeed later in the Active phase.</p>
-    <p>Reach / height tolerance: Punch <strong>32 / 32 px</strong>, Low <strong>34 / 32</strong>, Frontal <strong>38 / 48</strong>, High <strong>42 / 64</strong>, Sting <strong>27 / 10</strong>. Reach uses fighter center distances. Kick ranges are 4 px shorter than the original values; original 12 / 5 / 3 px knockback is preserved. The full combo connects from normal 23-25 px enemy engagement spacing. Each attack may damage each target once. Player attacks resolve first on simultaneous contact.</p>
-    <p><code>_hit</code> applies damage, push, optional launch, stun, and invulnerability (Jaan: 700 ms; mosquitoes: 280 ms). It clears the victim's buffer and combo, then enters Hurt or Dead. The victim's next rendered pose follows that new state.</p>
+    <p>Reach / height tolerance: Punch <strong>32 / 32 px</strong>, Low <strong>34 / 32</strong>, Frontal <strong>38 / 48</strong>, High <strong>42 / 64</strong>, Sting <strong>27 / 10</strong>. Reach uses fighter center distances. Kick ranges are 4 px shorter than the original values; original 12 / 5 / 3 px knockback is preserved for small mosquitoes. Grunts take only 25% of incoming push (3 / 1.25 / 0.75 px), so follow-up kicks remain in range. The full combo connects from normal 23-25 px enemy engagement spacing. Each attack may damage each target once. Player attacks resolve first on simultaneous contact.</p>
+    <p>Level 2 randomly promotes one small mosquito to veteran rank and level 3 promotes three, shown by a yellow asterisk beside its health bar. Its sting uses 0.24 / 0.10 / 0.36 seconds of startup / active / recovery; ordinary stings use 0.30 / 0.10 / 0.45. Damage, reach and movement speed are unchanged.</p>
+    <p><code>_hit</code> applies damage, push, optional launch, stun, and invulnerability (Jaan: 700 ms; mosquitoes: 280 ms). It clears the victim's buffer and combo, then enters Hurt or Dead. The victim's next rendered pose follows that new state. Grunts use brief KO-sheet recoil for ordinary hits, the full seven-frame KO followed by a reversed get-up for surviving critical finishers, and a separate 12-frame death over 960 ms for lethal hits.</p>
     <p><strong>Mosquito Hurt:</strong> five recoil frames play once over 250 ms using <code>stateTime</code>. The final pose holds through longer stun or launch. A new accepted hit resets the clock and restarts recoil. Only when the stun has elapsed <em>and</em> the victim has landed can it return to Idle.</p>
     <p><strong>Mosquito Dead:</strong> seven burst frames play once over 560 ms, then the mosquito is hidden. Dead remains terminal. <code>won</code> records zero-health enemies; <code>endingAnimationsFinished</code> checks that deaths, attacks, recoil and airborne motion have settled. Both victory and Jaan's defeat now wait for animations and a result popup before Score (see level ending below).</p>
     <p class="note">These durations come from combat state time. Finishing a sprite sheet never makes a fighter ready or advances the level.</p>
@@ -200,7 +201,7 @@
 </pre></details>
     <p>Space is a one-shot request, <strong>not an attack buffer</strong>. It starts a jump only while Jaan is idle/walking and not already airborne. No double jump and no jumping out of attack recovery. Movement and attacks can still begin in the air when the FSM permits them.</p>
     <p>The simulation applies 450 px/s² gravity. Jaan's jump lasts about 600 ms and peaks around 20 px. Ground X/Y, depth sorting, the shadow and camera anchoring stay on the street; only the drawn body moves upward.</p>
-    <p>Attacks compare both fighters' elevation. A sting only reaches within 10 px of height difference, so it can miss near Jaan's apex while takeoff and landing remain vulnerable. Enemy launches reuse the same gravity and elevation without becoming player jumps.</p>
+    <p>Attacks compare both fighters' elevation. A sting only reaches within 10 px of height difference, so it can miss near Jaan's apex while takeoff and landing remain vulnerable. Enemy launches reuse the same gravity and elevation without becoming player jumps. Kick launches have a 24 px ceiling above the ground; repeated hits use the remaining headroom instead of stacking height.</p>
   </section>
   <section class="guide-section" id="frame-flow">
     <h3>05 / ONE FRAME: RULES FIRST, SPRITES AFTER</h3>

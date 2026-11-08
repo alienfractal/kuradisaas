@@ -1,3 +1,4 @@
+import 'package:kuradi_saased/gen/fonts.gen.dart';
 import 'cga_palette.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
@@ -28,7 +29,7 @@ class SettingsButton extends PositionComponent with TapCallbacks {
   double elapsed = 0;
   final text = TextPaint(
       style: const TextStyle(
-          fontFamily: 'Arcade', fontSize: 4, color: CgaPalette.white));
+          fontFamily: FontFamily.arcade, fontSize: 4, color: CgaPalette.white));
 
   @override
   void update(double dt) {

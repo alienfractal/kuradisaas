@@ -1,3 +1,4 @@
+import 'package:kuradi_saased/gen/assets.gen.dart';
 import 'dart:math';
 import 'package:flame/game.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,11 +13,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test('Jaan death uses all seven native frames and holds the corpse',
       () async {
-    final sheet = ScenarioSheet.fromPath('jann_death_24x24-7.png');
+    final sheet =
+        ScenarioSheet.fromPath(Assets.resources.images.jannDeath24x247.path);
     expect([sheet.width, sheet.height, sheet.frames], [24, 24, 7]);
     final cache = FighterCacheService();
     await cache.preload(FlameGame());
-    final animation = FighterAnimationHandler(cache);
+    final animation = PlayerAnimationHandler(cache);
     for (final variant in PlayerDeathVariant.values) {
       final player = CombatLogicService().player
         ..health = 0
@@ -27,7 +29,7 @@ void main() {
           : cache.playerDead;
       expect(frames, hasLength(7));
       for (var i = 0; i < 7; i++) {
-        player.stateTime = (i + .5) * FighterModel.playerDeathDuration / 7;
+        player.stateTime = (i + .5) * PlayerModel.playerDeathDuration / 7;
         final frame = animation.frame(player, 99);
         expect(frame, same(frames[i]));
         expect(frame.srcSize, Vector2(24, 24));
@@ -45,13 +47,7 @@ void main() {
       () {
     final seen = <PlayerDeathVariant>{};
     for (var seed = 0; seed < 20; seed++) {
-      final player = FighterModel(
-          id: 0,
-          isPlayer: true,
-          x: 80,
-          y: 273,
-          attack: AttackSpec.punch,
-          random: Random(seed));
+      final player = PlayerModel(id: 0, x: 80, y: 273, random: Random(seed));
       player.enter(FighterState.dead);
       final selected = player.deathVariant;
       seen.add(selected);

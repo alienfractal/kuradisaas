@@ -1,0 +1,4 @@
+interface:
+  display_name: "UB Mode for Kuradi Saased"
+  short_description: "Domain design and verified Flutter game changes"
+  default_prompt: "Use $ub-mode to implement or refactor this game change with clear responsibilities and behavior checks."

@@ -1,10 +1,11 @@
+import 'package:kuradi_saased/gen/shaders.gen.dart';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 /// Captures the game once, then applies the shared CRT shader to that image.
 /// Off bypasses capture entirely. Coordinates and hit testing never change.
 class CrtRenderer {
-  static const shaderPath = 'resources/shaders/crt.frag';
+  static const shaderPath = ShaderAssets.crt;
   FragmentShader? _shader;
   Image? _texture;
   bool get available => _shader != null;

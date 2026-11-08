@@ -9,15 +9,18 @@ import 'package:kuradi_saased/game/states/arena/services/input_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late FighterCacheService cache;
-  late FighterAnimationHandler animations;
+  late MosquitoAnimationHandler animations;
   setUpAll(() async {
     cache = FighterCacheService();
     await cache.preload(FlameGame());
-    animations = FighterAnimationHandler(cache);
+    animations = MosquitoAnimationHandler(cache);
   });
 
   test('native reaction sheets keep flight size and use the state clock', () {
-    final fighter = CombatLogicService(enemyCount: 1).enemies.first;
+    final fighter = CombatLogicService(enemyCount: 1)
+        .enemies
+        .whereType<MosquitoModel>()
+        .single;
     expect(cache.mosquitoHit.length, 5);
     expect(cache.mosquitoDead.length, 7);
     for (final sprite in [
@@ -50,7 +53,7 @@ void main() {
   test('a real follow-up hit restarts recoil without unlocking the victim', () {
     final combat = CombatLogicService(enemyCount: 1);
     final input = InputService();
-    final target = combat.enemies.first
+    final target = combat.enemies.whereType<MosquitoModel>().first
       ..x = 103
       ..y = combat.player.y;
     void advance(double seconds) {
@@ -82,7 +85,7 @@ void main() {
       () {
     final combat = CombatLogicService(enemyCount: 1);
     final input = InputService()..punch();
-    final target = combat.enemies.first
+    final target = combat.enemies.whereType<MosquitoModel>().first
       ..x = 103
       ..y = combat.player.y
       ..health = 1;

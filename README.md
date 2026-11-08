@@ -2,7 +2,11 @@
 
 A real-time CGA karate brawler in Flutter + Flame, using the original Jaan and
 man-sized mosquito sprites. This playable slice is a scrolling night street
-campaign with two encounters. The archived GameMaker project remains
+campaign with three encounters. Level 2 marks one randomly chosen small mosquito
+with a yellow asterisk: this veteran attacks with a shorter windup and recovery.
+Level 3 mixes three veteran and two regular small mosquitoes with two tougher
+grunt mosquitoes. Grunts now have dedicated KO/get-up and death animations;
+lethal hits play all 12 death frames before disappearing. The archived GameMaker project remains
 untouched alongside this folder.
 
 ## Run
@@ -64,6 +68,13 @@ works offline. It covers combat states, the kick combo, hit reactions, jump moti
 frame flow and level endings. Editable sources and regeneration instructions are
 in [docs/combat/README.md](docs/combat/README.md).
 
+The [fighter arena UML](docs/fighter-arena-uml.md) has its own retro browser page
+at `fighter-arena.html` on the same server. Open `web/fighter-arena.html` directly
+for offline viewing. It shows model/entity inheritance, ownership and animation
+handlers, and construction/frame flow, with zoom, class-member details, and SVG
+downloads. Regenerate it from the canonical Markdown using
+`node tool/render_fighter_arena.mjs C:\path\to\pele.mjs` (Pele 1.6.0).
+
 | Control | Action |
 | --- | --- |
 | WASD / arrow keys | Walk horizontally and across depth lanes |
@@ -108,7 +119,13 @@ at 120 Hz; animations display the results and never control damage or recovery.
 - `lib/game/model/`: level definitions, results, and cumulative campaign score.
 - `lib/game/states/arena/model/`: fighter data, attack timing, arena bounds.
 - `lib/game/states/arena/services/`: combat rules, inputs, sprite cache.
+- Each screen's `services/` directory owns that state's sprites and button roles;
+  `KuradiSaased.stateSpriteServices` lists every global state's asset service.
+- `lib/utils/game_button.dart`: reusable cached sprite buttons with press/cancel
+  handling, shared by Menu, Lore, Pause, Score and End.
 - `lib/game/states/arena/handlers/`: visual mapping from combat states.
+- `lib/utils/`: shared `SpriteSpec`, `SpriteSheetSpec`, `SpriteAnimationSpec`,
+  and `SpriteAnimatorCache` loading/caching abstraction.
 - `lib/game/states/arena/view/`: layered street scenery and fighter components.
 - `lib/game/states/main_menu/views/`: `MainMenuView`, a Flame World.
 - `lib/game/states/loading/views/`: `LoadingView`, a Flame World.
@@ -118,8 +135,12 @@ at 120 Hz; animations display the results and never control damage or recovery.
 - `lib/game/view/`: shared Flame screen drawing/buttons, touch controls, HUD.
 - `test/`: combat and session regression tests.
 
-See [the architecture notes](docs/architecture.md) for design decisions,
-extension points, and current limitations; [asset notes](resources/ASSETS.md)
+Start with the [architecture and extension guide](docs/architecture-guide.md)
+for adding assets, characters, handlers, levels, views and cache services.
+The [whole-app UML](docs/app-architecture-uml.md) maps each state's views and
+models; open `app-architecture.html` beside the web game to explore it.
+See [the architecture notes](docs/architecture.md) for runtime design decisions
+and current limitations; [asset notes](resources/ASSETS.md)
 record what was imported. The included runner targets web.
 
 ## Street scenery and camera
@@ -149,6 +170,16 @@ controls and focus events; it does not render the global screens. Screen text
 and buttons share the same 320×200 logical resolution as gameplay.
 
 ## Verify / build
+
+Assets and font families use FlutterGen 5.12.0, matching the reference project.
+Use `Assets.resources...`, `FontFamily.arcade`, and `ShaderAssets` from `lib/gen/`; generated
+asset paths are complete bundle paths and must not receive an extra Flame prefix.
+After adding, removing, or renaming an asset, regenerate and include the generated
+files with the change:
+
+```powershell
+dart run build_runner build --delete-conflicting-outputs
+```
 
 ```powershell
 flutter analyze
@@ -186,7 +217,7 @@ while airborne are supported. Stings can miss while Jaan is high in the air,
 but takeoff and landing remain vulnerable.
 
 Punch: 1 damage, 9px knockback, 0.09/0.075/0.19s startup/active/recovery.
-R chains low -> frontal -> high, using native 24x24 sheets with 5/7/7 frames.
+R chains low -> frontal -> high, using native 24x24 sheets with 6/7/7 frames.
 Each follow-up requires a hit on the same surviving enemy and another R press
 within 0.42s of contact. Inputs buffer for 0.16s, so press near contact or recovery;
 holding R does not repeat. Missing, waiting too long, punching or taking damage
@@ -196,12 +227,15 @@ survivor hit.
 | Kick | Damage | Knockback | Launch speed | Startup / active / recovery |
 | --- | --- | --- | --- | --- |
 | Low | 1 | 12px | none | .14 / .10 / .48s |
-| Frontal | 2 | 5px | 130px/s | .12 / .10 / .50s |
-| High | 3 (critical) | 3px | 200px/s | .16 / .10 / .65s |
+| Frontal | 2 | 5px | 90px/s | .12 / .10 / .50s |
+| High | 3 (critical) | 3px | 120px/s | .16 / .10 / .65s |
 
 Kick reach uses center distances of 34/38/42 game pixels: a modest 4px
 reduction from the original 38/42/46 ranges. Original 12/5/3px knockback is
-preserved; all three hits connect at normal 23-25px enemy engagement spacing.
+preserved for regular mosquitoes; all three hits connect at normal 23-25px enemy
+engagement spacing. Grunts take only 25% of incoming horizontal knockback
+(3 / 1.25 / .75px from the three kicks), helping follow-ups connect even at the
+first kick's outer reach. Grunt resistance affects horizontal push only. Kick launches stay within 24 game pixels of the ground, including repeated airborne hits.
 
 A confirmed, buffered follow-up can begin after .08s of front recovery or .10s
 of high recovery. Otherwise the entire recovery applies. High kicks stun for
@@ -209,7 +243,10 @@ of high recovery. Otherwise the entire recovery applies. High kicks stun for
 Launched enemies cannot recover until they land. Mosquitoes now have 6 health,
 so a full 1+2+3 combo is lethal. The simulation selects the impact pose while
 active; no animation-completion callbacks unlock attacks.
-Mosquito sting: 0.30/0.10/0.45s, replacing the previous 0.42/0.10/0.65s.
+Regular mosquito sting: 0.30/0.10/0.45s. A level-2 veteran's sting uses
+0.24/0.10/0.36s: 20% shorter windup/recovery, with the same 1 damage and reach.
+One small mosquito is promoted at random on level 2; three are promoted on level 3;
+the asterisk remains visible beside its health bar while it is alive.
 All attack timings and hit decisions remain in the pure combat simulation.
 
 
@@ -272,8 +309,8 @@ No gameplay music has been assigned. For details see [docs/audio.md](docs/audio.
 The main menu and pause screen reuse the SFX, music and animated CRT icons from
 CoolorBurn/Revalia. Tap an audio icon to cycle **100% -> 67% -> 33% -> OFF**.
 Music defaults to **33%**; players can raise it using the music control.
-All HUD and control colors use black, bright cyan, magenta and white. Shared
-settings icons are converted to this CGA palette once when loaded. Touch buttons
+Drawn HUD/text/controls use black, bright cyan, magenta and white. Sprite buttons
+and settings icons retain their original artwork colors and transparency. Touch buttons
 use solid fills, and empty health cells use cyan outlines.
 The percentage under each icon shows its current value. Music updates while
 playing without restarting; the walking loop follows the SFX setting. Changing

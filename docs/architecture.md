@@ -1,5 +1,17 @@
 # Kuradi Sääsed architecture
 
+View the [whole-app UML](app-architecture-uml.md) or open
+`app-architecture.html` beside the running web game for a diagram of views,
+models and services in every application state.
+
+## How to extend the application
+
+Follow the [architecture and extension guide](architecture-guide.md) when adding
+assets, characters, animations, levels, screens or cache services. It defines
+class placement, ownership boundaries, reuse decisions, implementation steps
+and verification. This file describes the runtime details; the
+[fighter arena UML](fighter-arena-uml.md) maps the concrete relationships.
+
 ## Relationship to the reference projects
 
 RevaliaObscura supplies the organizing pattern: a Flame game as composition root,
@@ -38,7 +50,110 @@ movement, facing, knockback, invulnerability, and state transitions. Entity and
 animation code only read these results. Animation callbacks never unlock a
 fighter, deal damage, or advance a combat phase.
 
+## Fighter types and presentation
+
+See [Fighter arena UML](fighter-arena-uml.md) for Mermaid diagrams of the model
+and entity hierarchy, ownership, animation handlers, and construction/frame flow.
+Its offline [retro browser edition](../web/fighter-arena.html) is served at
+`fighter-arena.html` alongside the web game; regeneration instructions live in
+the UML document.
+
+`FighterModel` is the sealed, abstract domain base. Its library is split into
+`player_model.dart`, `enemy_model.dart`, `mosquito_model.dart`, and
+`grunt_model.dart` using Dart parts. Import `fighter_model.dart` to access them.
+`FighterKind` identifies the category; independently writable `isPlayer` and
+`isGrunt` flags are removed. Common state includes health, position, attacks,
+jump motion, and hit/death phases. `PlayerModel` owns combo confirmation,
+death-variant selection, knockdown recovery, and air steering permission.
+`EnemyModel` exposes attack choice and movement speed; `GruntModel` advances
+light/heavy alternation only when a windup reaches its strike phase. Incoming
+horizontal push uses the target's `knockbackMultiplier`: 1 normally, .25 for
+grunts. Attack damage, reach, and launch are unaffected.
+
+`MosquitoRank` configures regular/veteran mosquitoes without another identity
+flag, model subclass, or factory branch. `LevelDefinition.veteranCount` is one
+on level 2, three on level 3, and zero on level 1. Combat randomly selects unique
+small-mosquito slots (excluding grunts); an optional injected `Random` makes
+selection reproducible in tests. Veteran sting startup/recovery are .24/.36s,
+versus .30/.45s normally. `MosquitoEntity` draws the persistent yellow asterisk
+beside the health bar; simulation does not know about that artwork.
+
+`FighterEntity<M extends FighterModel>` is an abstract `PositionComponent` with
+a final typed model and a `FighterAnimationHandler<M>`. `PlayerEntity`,
+`MosquitoEntity`, and `GruntEntity` bind their corresponding model and animation
+handler at construction. `EnemyEntity` shares enemy overlays and disappearance;
+the fighter base shares positioning, shadows, sprite drawing, and debug bounds.
+Player blinking and grunt source facing belong to their concrete entities.
+Each animation handler owns its character's frame selection and draw size.
+
+`createFighterEntity` in `fighter_entity_factory.dart` is the presentation
+composition boundary: an exhaustive switch over model subtypes chooses an
+entity. Adding a model requires connecting its entity there, without putting
+character checks back into the renderer. The simulation creates concrete models
+and uses enemy capabilities rather than checking for grunts during combat.
+Shared combat phases, cache ownership, and pixel preparation remain independent
+of model variants.
+
 ## Global game lifecycle
+
+### Sprite and animation caches
+
+`lib/utils/sprite_spec.dart` defines `SpriteSheetSpec` (horizontal sheet metadata
+and validation), `SpriteSpec` (a loaded sprite and its display size), and
+`SpriteAnimationSpec` (shared frames, frame timing, and loop/hold behavior).
+Animation specs create fresh Flame animations for independently ticking views,
+or sample a supplied clock through `frameAt` for simulation-driven presentation.
+
+`lib/utils/animator_cache_service.dart` supplies `SpriteAnimatorCache`, the base
+for `FighterCacheService`, `ScenarioCacheService`, `MenuCacheService`, and
+`SettingsCacheService`. It deduplicates repeated and concurrent sheet requests,
+validates image dimensions, and lets failed requests retry. Each service belongs
+to one game instance; there is no global cache registry. Flame caches the source
+images. UI caches retain those source images and their original colors/alpha.
+FlutterGen 5.12.0 generates `lib/gen/assets.gen.dart` and `fonts.gen.dart` from
+`pubspec.yaml`. All runtime asset references use `Assets.resources...`; font
+families use `FontFamily.arcade`. Generated paths include their resource directory,
+so the shared sheet loader uses an empty Flame image prefix. Source paths belong
+in the manifest and generated files. FlutterGen 5.12 does not read `shaders`, so
+the same build-runner command also generates `ShaderAssets` from that manifest
+section via `tool/shader_assets_builder.dart`. Shaders stay exclusively in
+`shaders` so Flutter compiles them correctly.
+
+Scenario stars declare their skipped leading cell explicitly. Settings sheets
+without filename metadata declare their layout explicitly. Fighter loops use
+animation specs, while attacks and hit/death poses remain sampled from combat
+state time in `FighterAnimationHandler`. Completing an animation never advances
+combat. The compatibility name `ScenarioSheet` aliases `SpriteSheetSpec`.
+
+### State asset ownership and sprite buttons
+
+`KuradiSaased.stateSpriteServices` maps every `GlobalGameState` to its service.
+Boot preloads these services; entering a state passes that service into its view.
+Add new screen-specific assets to the corresponding service, using FlutterGen
+references. The initial Loading service is prepared first so its own animation
+can remain visible while the other state services load.
+
+| Global state | Service | Assets owned by the state |
+| --- | --- | --- |
+| Menu | `MenuCacheService` | Intro/logo frames, Lore animation, Start/Lore/Back buttons |
+| Loading | `LoadingCacheService` | Flying mosquito loading animation |
+| Level | `LevelCacheService` | `FighterCacheService` and `ScenarioCacheService` |
+| Paused | `PauseCacheService` | Resume and Back to Menu buttons |
+| Score | `ScoreCacheService` | Continue/next-level button |
+| End | `EndCacheService` | Back to Menu button |
+
+`ButtonSpriteCacheService` shares the reference project's unmodified button artwork. Each state's service declares its button roles. Views
+create independent `GameButton` components, which extend Flame's
+`SpriteButtonComponent`: cached artwork is shared, pressed/enabled/input state is
+per button. Nine-slice rendering preserves the pixel border, covers the baked
+START text and renders each action's own label. A canceled or disabled press
+cannot invoke the action. Settings icons retain their separate shared cache.
+
+The reference project's outer `GameMenu` maps to `GlobalGameState.menu` here.
+Entering it activates `GameMenuFsm`; its Intro/Logo/Main/Lore entries select the
+corresponding worlds and use `MenuCacheService`. Substate transitions call exit
+then enter, clearing input on exit. Leaving the outer Menu calls `menuFsm.leave`,
+stopping its logo clock and rejecting menu input until the next `begin`.
 
 `GlobalGameState` and `GlobalGameFsm` own the application flow, separate from every
 fighter's `FighterState`. Boot preloads shared sprites and opens Main Menu.
@@ -66,7 +181,8 @@ Continuing from a cleared level enters Loading for the next level if one exists;
 otherwise it enters End. Defeat also leads from Score to End. End returns to Menu.
 Pause resumes the same level, or abandons it to Menu without recording a result.
 
-Two street encounters (five and seven mosquitoes) exercise this full flow.
+Three street encounters exercise this full flow, with veterans on levels 2/3
+and two grunts on level 3.
 Definitions live in `CampaignModel`; each receives a fresh arena and full player
 health. Scores survive world replacement, but reset when starting a new run.
 Scoring is 10 per landed attack, 100 per defeated mosquito, and 25 per remaining health
@@ -100,7 +216,11 @@ once in .25s, then holds its final pose during extended stun/launch. Dead plays
 the seven-frame burst once over .56s, with no blinking or squash. These are read
 from stateTime; finishing a sheet never changes combat. The final enemy's death
 window completes before the ending popup (`endingAnimationsFinished`); `won`
-still means every enemy has zero health. Both win and defeat use the same
+still means every enemy has zero health. Grunts override the death window to
+.96s for their 12-frame death sheet. Their animation handler samples the first
+three KO frames for ordinary recoil; surviving critical finishers play the full
+seven-frame KO, hold, then reverse it in the last .35s of stun. These poses use
+the existing Hurt state and do not change combat recovery or add immunity. Both win and defeat use the same
 settlement/popup flow before Score.
 
 An attack can hit multiple opponents, once each. Range is checked in front of
@@ -176,13 +296,14 @@ A single buffered press cannot queue multiple stages. Follow-ups require a fresh
 R press near contact/recovery (input buffer 0.16 seconds).
 
 Front/high/very-high deal 1/2/3 damage. Front pushes 12px; high pushes 5px and
-launches at 130px/s; the critical finisher pushes 3px and launches at 200px/s.
-High stuns for .70s, very-high for 1.2s. Launched victims remain hurt until both
+launches at 90px/s; the critical finisher pushes 3px and launches at 120px/s.
+`FighterModel.launch` limits upward velocity using the remaining headroom below a 24px ground-relative ceiling, so repeated hits cannot stack launch height. Player jumps retain their own speed. High stuns for .70s, very-high for 1.2s. Launched victims remain hurt until both
 the stun expires and they land. The runtime defaults to 6-health mosquitoes.
 
 `FighterCacheService` slices the three named sheets using their filename metadata.
 `FighterAnimationHandler` maps startup, active and recovery to explicit poses:
-front impacts at frame 2; high and very-high impact at frame 1 (zero-based).
+each kick reserves its final two loaded frames for contact; preceding frames
+provide windup and reversed recovery.
 Animation completion never changes the FSM or confirms a hit. Launch rendering
 lifts the sprite and health indicators while leaving shadow and depth order on
 the ground. A white pixel star marks a surviving critical victim's stun.
@@ -230,9 +351,10 @@ access the real audio platform. See `docs/audio.md`.
 volume steps map directly to the shared 4-frame sheets. `SettingsControls` is
 reused by MainMenuView and PauseView. The original orange volume art and animated
 CRT sheet are copied unchanged from CoolorBurn. No delayed tap callbacks are used.
-`SettingsCacheService` converts these sheets once on load through `CgaPalette`
-and owns the converted images until disposal. The HUD and controls share its
-black/cyan/magenta/white constants. Touch fills are opaque and direction/pause
+`SettingsCacheService` loads the original sheets without palette conversion.
+Button and settings sprites retain their source colors and transparency; no
+pressed/disabled tint is applied. `CgaPalette` supplies colors only for drawn
+HUD, text and touch controls. Touch fills are opaque and direction/pause
 glyphs use integer pixel rectangles; empty health cells have cyan outlines.
 
 Volume callbacks update the real audio backend: music/walking channel gains

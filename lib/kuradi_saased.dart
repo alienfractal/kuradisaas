@@ -1,3 +1,10 @@
+import 'utils/animator_cache_service.dart';
+import 'game/services/button_sprite_cache_service.dart';
+import 'game/states/loading/services/loading_cache_service.dart';
+import 'game/states/arena/services/level_cache_service.dart';
+import 'game/states/pause/services/pause_cache_service.dart';
+import 'game/states/score/services/score_cache_service.dart';
+import 'game/states/end/services/end_cache_service.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'audio/audio_player_wrapper.dart';
@@ -37,7 +44,8 @@ import 'game/states/pause/views/pause_view.dart';
 
 class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
   late final fsm = GlobalGameFsm(onEnter: _enterState);
-  late final menuFsm = GameMenuFsm(onEnter: _enterMenuState);
+  late final menuFsm =
+      GameMenuFsm(onEnter: _enterMenuState, onExit: (_) => input.clear());
   final phase = ValueNotifier(GlobalGameState.loading);
   final input = InputService();
   final GameAudioService audio;
@@ -45,7 +53,24 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
   final combatInputEnabled = ValueNotifier(false);
   final spriteCache = FighterCacheService();
   final scenarioCache = ScenarioCacheService();
-  final menuCache = MenuCacheService();
+  final buttonCache = ButtonSpriteCacheService();
+  late final menuCache = MenuCacheService(buttonCache);
+  final loadingCache = LoadingCacheService();
+  late final levelCache = LevelCacheService(spriteCache, scenarioCache);
+  late final pauseCache = PauseCacheService(buttonCache);
+  late final scoreCache = ScoreCacheService(buttonCache);
+  late final endCache = EndCacheService(buttonCache);
+
+  /// Every outer FSM state has one explicit asset-loading boundary.
+  late final Map<GlobalGameState, SpriteAnimatorCache> stateSpriteServices =
+      Map.unmodifiable({
+    GlobalGameState.loading: loadingCache,
+    GlobalGameState.menu: menuCache,
+    GlobalGameState.level: levelCache,
+    GlobalGameState.paused: pauseCache,
+    GlobalGameState.score: scoreCache,
+    GlobalGameState.end: endCache,
+  });
   final settings = GameSettings();
   final settingsCache = SettingsCacheService();
   final crt = CrtRenderer();
@@ -68,10 +93,11 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
     await super.onLoad();
     camera.viewport = FixedResolutionViewport(resolution: Vector2(320, 200));
     camera.viewfinder.anchor = Anchor.topLeft;
-    switchToWorld(LoadingView(description: 'SPRITES'));
-    await spriteCache.preload(this);
-    await scenarioCache.preload(this);
-    await menuCache.preload(this);
+    await loadingCache.preload(this);
+    switchToWorld(LoadingView(description: 'SPRITES', sprites: loadingCache));
+    for (final cache in stateSpriteServices.values) {
+      await cache.preload(this);
+    }
     await settingsCache.preload(this);
     await crt.preload();
     await audio.setVolumes(
@@ -91,6 +117,7 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
 
   /// Like Revalia, entering a global state selects that state's Flame World.
   void _enterState(GlobalGameState state) {
+    if (state != GlobalGameState.menu) menuFsm.leave();
     if (state != GlobalGameState.menu && state != GlobalGameState.level) {
       audio.leaveScreen();
     }
@@ -100,17 +127,20 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
         _levelView = null;
         menuFsm.begin(showIntro: !_introCompleted);
       case GlobalGameState.loading:
-        switchToWorld(LoadingView(description: campaign.level.title));
+        switchToWorld(LoadingView(
+            description: campaign.level.title, sprites: loadingCache));
       case GlobalGameState.level:
         switchToWorld(_levelView!);
       case GlobalGameState.paused:
         switchToWorld(PauseView(
+            sprites: pauseCache,
             onResume: togglePause,
             onMenu: showMenu,
             settingsControls: SettingsControls(this)));
       case GlobalGameState.score:
         _levelView = null;
         switchToWorld(GameScoreView(
+            sprites: scoreCache,
             result: campaign.result!,
             levelNumber: campaign.levelIndex + 1,
             levelCount: campaign.levels.length,
@@ -119,6 +149,7 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
             onContinue: primaryAction));
       case GlobalGameState.end:
         switchToWorld(GameEndView(
+            sprites: endCache,
             completed: campaign.completed,
             totalScore: campaign.totalScore,
             onMenu: showMenu));
@@ -135,13 +166,13 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
       case MenuState.main:
         _introCompleted = true;
         switchToWorld(MainMenuView(
+            sprites: menuCache,
             onStart: primaryAction,
             onLore: showLore,
             settingsControls: SettingsControls(this),
             loadingError: loadingError));
       case MenuState.lore:
-        switchToWorld(
-            LoreView(frames: menuCache.loreFrames, onBack: closeLore));
+        switchToWorld(LoreView(sprites: menuCache, onBack: closeLore));
     }
   }
 
@@ -243,7 +274,10 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
     try {
       final definition = campaign.level;
       combat = CombatLogicService(
-          config: definition.arena, enemyCount: definition.enemyCount);
+          config: definition.arena,
+          enemyCount: definition.enemyCount,
+          gruntCount: definition.gruntCount,
+          veteranCount: definition.veteranCount);
       final nextLevel =
           ArenaView(combat, spriteCache, () => showDebug, scenarioCache);
       _levelView = nextLevel;
@@ -329,7 +363,7 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
       return;
     }
     if (fsm.phase != GlobalGameState.level) {
-      super.update(0);
+      super.update(fsm.phase == GlobalGameState.loading ? dt : 0);
       return;
     }
     _accumulator += math.min(dt, .1);
@@ -427,6 +461,10 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
 
   @override
   void onDispose() {
+    for (final cache in stateSpriteServices.values) {
+      cache.dispose();
+    }
+    buttonCache.dispose();
     settingsCache.dispose();
     crt.dispose();
     unawaited(audio.dispose());

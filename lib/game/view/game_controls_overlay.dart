@@ -1,3 +1,4 @@
+import 'package:kuradi_saased/gen/fonts.gen.dart';
 import 'dart:ui' show ViewFocusEvent, ViewFocusState;
 import 'package:flutter/material.dart';
 import '../../kuradi_saased.dart';
@@ -92,7 +93,9 @@ class _GameControlsOverlayState extends State<GameControlsOverlay>
   Widget _action(String label, VoidCallback onDown) => _HoldButton(
       label: Text(label,
           style: const TextStyle(
-              fontFamily: 'Arcade', fontSize: 8, color: CgaPalette.white)),
+              fontFamily: FontFamily.arcade,
+              fontSize: 8,
+              color: CgaPalette.white)),
       semanticLabel: label,
       onDown: onDown,
       onUp: () {},

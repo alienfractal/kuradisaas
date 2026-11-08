@@ -1,0 +1,17 @@
+targets:
+  $default:
+    builders:
+      flutter_gen_runner:
+        enabled: true
+        options:
+          output: lib/gen/
+          line_length: 80
+      kuradi_saased:shader_assets:
+        enabled: true
+
+builders:
+  shader_assets:
+    import: "tool/shader_assets_builder.dart"
+    builder_factories: ["shaderAssetsBuilder"]
+    build_extensions: {"pubspec.yaml": ["lib/gen/shaders.gen.dart"]}
+    build_to: source

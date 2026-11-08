@@ -1,9 +1,8 @@
 import 'dart:ui';
 import 'package:flame/components.dart';
-import '../handlers/fighter_animation_handler.dart';
 import '../services/combat_logic_service.dart';
 import '../services/fighter_cache_service.dart';
-import 'fighter_entity.dart';
+import 'fighter_entity_factory.dart';
 import 'street_scenery.dart';
 import '../services/scenario_cache_service.dart';
 
@@ -15,10 +14,9 @@ class ArenaView extends World {
   ArenaView(this.combat, this.cache, this.showDebug, this.scenery);
   @override
   Future<void> onLoad() async {
-    final animations = FighterAnimationHandler(cache);
     await add(StreetScenery(scenery, combat.config));
     await addAll(
-        combat.fighters.map((f) => FighterEntity(f, animations, showDebug)));
+        combat.fighters.map((f) => createFighterEntity(f, cache, showDebug)));
     await add(_ArenaBounds(combat, showDebug));
   }
 }

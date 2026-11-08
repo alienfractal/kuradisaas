@@ -1,13 +1,16 @@
+import '../services/score_cache_service.dart';
 import '../../../model/campaign_model.dart';
 import '../../../view/screen_view.dart';
 
 class GameScoreView extends ScreenView {
+  final ScoreCacheService sprites;
   final LevelResult result;
   final int levelNumber, levelCount, totalScore;
   final bool hasNextLevel;
   final void Function() onContinue;
   GameScoreView(
-      {required this.result,
+      {required this.sprites,
+      required this.result,
       required this.levelNumber,
       required this.levelCount,
       required this.totalScore,
@@ -28,7 +31,8 @@ class GameScoreView extends ScreenView {
     label('LEVEL SCORE  ${result.score}\nTOTAL SCORE  $totalScore', 123);
     action(
         result.cleared && hasNextLevel ? 'LOAD NEXT LEVEL' : 'CONTINUE TO END',
-        onContinue);
+        onContinue,
+        skin: sprites.continueButton);
     label('ENTER TO CONTINUE', 181, fontSize: 5);
   }
 }

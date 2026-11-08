@@ -1,12 +1,14 @@
+import 'package:kuradi_saased/gen/assets.gen.dart';
+
 class GameSounds {
-  static const logo = 'resources/sound/alien_retro_logo_mfx.ogg';
-  static const lore = 'resources/sound/alien_retro_intro.ogg';
-  static const jump = 'resources/sound/sfx_jaan_jump_1.wav';
-  static const walk = 'resources/sound/sfx_kurat_jaan_walk.ogg';
+  static final logo = Assets.resources.sound.alienRetroLogoMfx;
+  static final lore = Assets.resources.sound.alienRetroIntro;
+  static final jump = Assets.resources.sound.sfxJaanJump1;
+  static final walk = Assets.resources.sound.sfxKuratJaanWalk;
   // .467s recording -> ~.36s, two footfalls per .72s walking sprite cycle.
   static const walkPlaybackRate = 1.3;
-  static const attack = 'resources/sound/blockHit1.mp3';
-  static const impact = 'resources/sound/blockHit2.mp3';
-  static const hurt = 'resources/sound/blockHit3.mp3';
-  static const effects = [jump, attack, impact, hurt];
+  static final attack = Assets.resources.sound.blockHit1;
+  static final impact = Assets.resources.sound.blockHit2;
+  static final hurt = Assets.resources.sound.blockHit3;
+  static final effects = [jump, attack, impact, hurt];
 }

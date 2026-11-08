@@ -1,3 +1,4 @@
+import 'package:kuradi_saased/gen/fonts.gen.dart';
 import 'cga_palette.dart';
 import 'package:flame/components.dart';
 import 'package:flame/text.dart';
@@ -11,10 +12,12 @@ class LevelResultPopup extends Component {
   final KuradiSaased game;
   final title = TextPaint(
       style: const TextStyle(
-          fontFamily: 'Arcade', fontSize: 11, color: CgaPalette.magenta));
+          fontFamily: FontFamily.arcade,
+          fontSize: 11,
+          color: CgaPalette.magenta));
   final text = TextPaint(
       style: const TextStyle(
-          fontFamily: 'Arcade', fontSize: 5, color: CgaPalette.white));
+          fontFamily: FontFamily.arcade, fontSize: 5, color: CgaPalette.white));
 
   @override
   void render(Canvas canvas) {

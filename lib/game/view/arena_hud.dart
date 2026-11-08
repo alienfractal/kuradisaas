@@ -1,3 +1,4 @@
+import 'package:kuradi_saased/gen/fonts.gen.dart';
 import 'cga_palette.dart';
 import 'package:flame/components.dart';
 import 'package:flame/text.dart';
@@ -10,7 +11,7 @@ class ArenaHud extends Component {
   ArenaHud(this.game);
   final text = TextPaint(
       style: const TextStyle(
-          fontFamily: 'Arcade', fontSize: 6, color: CgaPalette.white));
+          fontFamily: FontFamily.arcade, fontSize: 6, color: CgaPalette.white));
   @override
   void render(Canvas canvas) {
     if (game.fsm.phase != GlobalGameState.level) {

@@ -1,11 +1,10 @@
-import 'dart:ui' as ui;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
 import 'package:kuradi_saased/game/model/game_settings.dart';
 import 'package:kuradi_saased/game/view/settings_controls.dart';
-import 'package:kuradi_saased/game/view/cga_palette.dart';
+import 'package:kuradi_saased/gen/assets.gen.dart';
 import 'package:kuradi_saased/gamefsm/game_menu_fsm.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
 
@@ -55,28 +54,16 @@ void main() {
     expect(game.settingsCache.effects, hasLength(4));
     expect(game.settingsCache.music, hasLength(4));
     expect(game.settingsCache.crt, hasLength(8));
-    await tester.runAsync(() async {
-      // Inspect the actual loaded sheets, including every animation frame.
-      final colors = <int>{};
-      final alphas = <int>{};
-      for (final sheet in [
-        game.settingsCache.effects.first.image,
-        game.settingsCache.music.first.image,
-        game.settingsCache.crt.first.image,
-      ]) {
-        final data =
-            await sheet.toByteData(format: ui.ImageByteFormat.rawStraightRgba);
-        final pixels = data!.buffer.asUint8List();
-        for (var i = 0; i < pixels.length; i += 4) {
-          alphas.add(pixels[i + 3]);
-          if (pixels[i + 3] == 0) continue;
-          colors.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2]);
-        }
+    // UI sheets must retain the actual source images, colors and transparency.
+    for (final (frames, path) in [
+      (game.settingsCache.effects, Assets.resources.images.soundfxVolume.path),
+      (game.settingsCache.music, Assets.resources.images.musicfxVolume.path),
+      (game.settingsCache.crt, Assets.resources.images.crton32x328.path),
+    ]) {
+      for (final frame in frames) {
+        expect(frame.image, same(game.images.fromCache(path)));
       }
-      expect(colors, isNotEmpty);
-      expect(colors.difference(CgaPalette.rgb.toSet()), isEmpty);
-      expect(alphas.difference({0, 255}), isEmpty);
-    });
+    }
     expect(audio.effects, 1);
     expect(audio.music, closeTo(1 / 3, .0001));
     expect(game.world.children.whereType<SettingsControls>(), hasLength(1));

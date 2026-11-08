@@ -1,3 +1,4 @@
+import 'package:kuradi_saased/gen/assets.gen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kuradi_saased/game/states/arena/model/arena_config.dart';
 import 'package:kuradi_saased/game/states/arena/services/combat_logic_service.dart';
@@ -9,8 +10,10 @@ void main() {
     final stars = ScenarioSheet.fromPath(ScenarioCacheService.starsPath);
     expect([stars.width, stars.height, stars.frames], [640, 320, 3]);
     expect(ScenarioSheet.fromPath(ScenarioCacheService.streetPath).frames, 1);
-    final hurt = ScenarioSheet.fromPath('mosquito-hit-32x32-5.png');
-    final dead = ScenarioSheet.fromPath('mosquito-dead_32x32t-7.png');
+    final hurt =
+        ScenarioSheet.fromPath(Assets.resources.images.mosquitoHit32x325.path);
+    final dead = ScenarioSheet.fromPath(
+        Assets.resources.images.mosquitoDead32x32t7.path);
     expect([hurt.width, hurt.height, hurt.frames], [32, 32, 5]);
     expect([dead.width, dead.height, dead.frames], [32, 32, 7]);
     expect(() => ScenarioSheet.fromPath('missing.png'), throwsFormatException);

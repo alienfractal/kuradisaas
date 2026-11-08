@@ -1,7 +1,10 @@
+import 'package:kuradi_saased/gen/fonts.gen.dart';
 import 'package:flame/components.dart';
 import 'package:flame/text.dart';
 import 'package:flutter/painting.dart';
 import '../../../view/screen_view.dart';
+import '../../../../utils/sprite_spec.dart';
+import '../services/menu_cache_service.dart';
 
 /// A separate menu World. Its decorative animation cannot advance game state.
 class LoreView extends World {
@@ -12,15 +15,17 @@ class LoreView extends World {
       'MUTANT MOSQUITOES RUINED HIS SUMMER.\n'
       "HE'S SEEN TOO MANY. HE WANTS REVENGE.";
 
-  LoreView({required this.frames, required this.onBack});
-  final List<Sprite> frames;
+  LoreView({required this.sprites, required this.onBack});
+  final MenuCacheService sprites;
+  SpriteAnimationSpec get animationSpec => sprites.loreAnimation;
+  List<Sprite> get frames => animationSpec.frames;
   final void Function() onBack;
   late final SpriteAnimationComponent background;
 
   @override
   Future<void> onLoad() async {
     background = SpriteAnimationComponent(
-        animation: SpriteAnimation.spriteList(frames, stepTime: frameDuration),
+        animation: animationSpec.createAnimation(),
         size: Vector2.all(256),
         paint: Paint()
           ..filterQuality = FilterQuality.none
@@ -36,7 +41,7 @@ class LoreView extends World {
         anchor: Anchor.topCenter,
         textRenderer: TextPaint(
             style: const TextStyle(
-                fontFamily: 'Arcade',
+                fontFamily: FontFamily.arcade,
                 fontSize: 10,
                 color: Color(0xFFFF55FF)))));
     await add(RectangleComponent(
@@ -52,12 +57,12 @@ class LoreView extends World {
         position: Vector2(16, 172),
         textRenderer: TextPaint(
             style: const TextStyle(
-                fontFamily: 'Arcade',
+                fontFamily: FontFamily.arcade,
                 fontSize: 6,
                 height: 1.5,
                 color: Color(0xFFFFFFFF)))));
-    await add(ScreenButton('BACK TO MENU [ESC]', onBack,
-        position: Vector2(128, 239)));
+    await add(GameButton('BACK TO MENU [ESC]', onBack,
+        skin: sprites.backButton, position: Vector2(128, 239)));
   }
 
   @override

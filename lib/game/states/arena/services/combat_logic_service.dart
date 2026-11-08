@@ -7,34 +7,51 @@ import 'input_service.dart';
 /// Pure simulation. No Flame components, animations, or wall-clock callbacks.
 class CombatLogicService {
   final ArenaConfig config;
-  late final FighterModel player;
-  late final List<FighterModel> enemies;
+  late final PlayerModel player;
+  late final List<EnemyModel> enemies;
   int hits = 0;
   final List<CombatEvent> events = [];
   CombatLogicService(
       {this.config = const ArenaConfig(),
       int enemyCount = 5,
-      int enemyHealth = 6}) {
-    player = FighterModel(
+      int gruntCount = 0,
+      int veteranCount = 0,
+      int enemyHealth = 6,
+      math.Random? random}) {
+    if (gruntCount < 0 || gruntCount > enemyCount) {
+      throw ArgumentError('Grunts must be part of the enemy count');
+    }
+    final mosquitoCount = enemyCount - gruntCount;
+    if (veteranCount < 0 || veteranCount > mosquitoCount) {
+      throw ArgumentError('Veterans must be part of the small mosquito count');
+    }
+    final veteranIndices = <int>{};
+    if (veteranCount > 0) {
+      final candidates = List.generate(mosquitoCount, (i) => i)
+        ..shuffle(random ?? math.Random());
+      veteranIndices.addAll(candidates.take(veteranCount));
+    }
+    player = PlayerModel(
         id: 0,
-        isPlayer: true,
         x: 80.0.clamp(config.minX, config.maxX),
-        y: (config.minY + config.maxY) / 2,
-        attack: AttackSpec.punch,
-        maxHealth: 8);
-    enemies = List.generate(
-        enemyCount,
-        (i) => FighterModel(
-            id: i + 1,
-            isPlayer: false,
-            x: 190 +
-                (enemyCount == 1
-                    ? 0
-                    : i * (config.maxX - 100 - 190) / (enemyCount - 1)),
-            y: config.minY + (config.maxY - config.minY) * (.2 + (i % 3) * .3),
-            facing: -1,
-            attack: AttackSpec.sting,
-            maxHealth: enemyHealth));
+        y: (config.minY + config.maxY) / 2);
+    enemies = List.generate(enemyCount, (i) {
+      final x = 190.0 +
+          (enemyCount == 1
+              ? 0
+              : i * (config.maxX - 100 - 190) / (enemyCount - 1));
+      final y = config.minY + (config.maxY - config.minY) * (.2 + (i % 3) * .3);
+      return i >= enemyCount - gruntCount
+          ? GruntModel(id: i + 1, x: x, y: y)
+          : MosquitoModel(
+              id: i + 1,
+              x: x,
+              y: y,
+              maxHealth: enemyHealth,
+              rank: veteranIndices.contains(i)
+                  ? MosquitoRank.veteran
+                  : MosquitoRank.regular);
+    });
   }
   List<FighterModel> get fighters => [player, ...enemies];
   int get defeated => enemies.where((e) => !e.alive).length;
@@ -44,7 +61,7 @@ class CombatLogicService {
       fighters.every((f) =>
           !f.airborne &&
           (f.alive
-              ? !f.attacking && f.state != FighterState.hurt
+              ? !f.attacking && f.state != FighterState.hurt && !f.knockedDown
               : f.deathReactionFinished));
   void update(double dt, InputService input) {
     events.clear();
@@ -55,11 +72,10 @@ class CombatLogicService {
     if (settling) {
       input.clear();
       for (final fighter in fighters) {
-        fighter.clearAttackBuffer();
-        fighter.clearCombo();
+        fighter.clearPendingActions();
       }
     }
-    if (player.alive && !settling) {
+    if (player.alive && !settling && !player.knockedDown) {
       if (kick) {
         player.queueAttack(AttackSpec.frontKick);
       } else if (punch) {
@@ -72,11 +88,7 @@ class CombatLogicService {
       }
     }
     for (final fighter in fighters) {
-      fighter.invulnerability = math.max(0, fighter.invulnerability - dt);
-      fighter.attackBuffer = math.max(0, fighter.attackBuffer - dt);
-      if (fighter.attackBuffer == 0) fighter.bufferedAttack = null;
-      fighter.comboWindow = math.max(0, fighter.comboWindow - dt);
-      if (fighter.comboWindow == 0) fighter.clearCombo();
+      fighter.advanceTimers(dt);
       _advanceJump(fighter, dt);
       _advanceState(fighter, dt);
     }
@@ -100,24 +112,25 @@ class CombatLogicService {
       }
     }
     for (final enemy in enemies.where((e) => e.alive && e.canMove)) {
-      if (!player.alive) {
+      if (!player.alive || player.knockedDown) {
         enemy.enter(FighterState.idle);
         continue;
       }
       final dx = player.x - enemy.x;
       final dy = player.y - enemy.y;
       enemy.facing = dx < 0 ? -1 : 1;
-      if (dx.abs() <= 25 && dy.abs() <= 8) {
-        enemy.beginAttack();
+      final nextAttack = enemy.nextAttack;
+      if (dx.abs() <= nextAttack.reach - 2 && dy.abs() <= 8) {
+        enemy.beginAttack(nextAttack);
       } else {
         _move(enemy, dx.abs() > 23 ? dx.sign : 0, dy.abs() > 4 ? dy.sign : 0,
-            25, dt);
+            enemy.moveSpeed, dt);
       }
     }
     // Stable ordering gives the player's attack priority on simultaneous contact.
     for (final attacker in fighters) {
       if (attacker.state != FighterState.active) continue;
-      final targets = attacker.isPlayer ? enemies : [player];
+      final targets = identical(attacker, player) ? enemies : [player];
       for (final target in targets) {
         if (_canHit(attacker, target)) _hit(attacker, target);
       }
@@ -163,23 +176,27 @@ class CombatLogicService {
       FighterState.active => f.attack.active,
       FighterState.recovery => f.attack.recovery,
       FighterState.hurt => f.hitStunDuration,
+      FighterState.knockedDown => PlayerModel.knockdownDuration,
+      FighterState.gettingUp => PlayerModel.getUpDuration,
       _ => double.infinity,
     };
     if (f.stateTime < duration ||
         (f.state == FighterState.hurt && f.airborne)) {
       return;
     }
-    if (f.state == FighterState.active &&
+    if (identical(f, player) &&
+        f.state == FighterState.active &&
         f.attack.isKick &&
         (f.hitTargets.isEmpty ||
-            (f.comboTargetId != null &&
-                !f.hitTargets.contains(f.comboTargetId)))) {
-      f.clearCombo();
+            (player.comboTargetId != null &&
+                !f.hitTargets.contains(player.comboTargetId)))) {
+      player.clearCombo();
     }
     final remainder = f.stateTime - duration;
     f.enter(switch (f.state) {
       FighterState.startup => FighterState.active,
       FighterState.active => FighterState.recovery,
+      FighterState.knockedDown => FighterState.gettingUp,
       _ => FighterState.idle,
     });
     f.stateTime = remainder;
@@ -199,6 +216,7 @@ class CombatLogicService {
   bool _canHit(FighterModel a, FighterModel b) {
     final forward = (b.x - a.x) * a.facing;
     return b.alive &&
+        !b.knockedDown &&
         b.invulnerability <= 0 &&
         !a.hitTargets.contains(b.id) &&
         forward >= 0 &&
@@ -212,30 +230,29 @@ class CombatLogicService {
     events.add(CombatEvent(CombatEventType.hitLanded,
         fighterId: a.id, targetId: b.id, attack: a.attack.kind));
     b.health = math.max(0, b.health - a.attack.damage);
-    b.clearAttackBuffer();
-    b.clearCombo();
+    b.clearPendingActions();
     b.hitStunDuration = a.attack.stunSeconds;
     b.lastHitCritical = a.attack.critical;
     if (a.attack.launchSpeed > 0) {
-      b.verticalVelocity = a.attack.launchSpeed;
-      b.jumpTime = 0;
+      b.launch(a.attack.launchSpeed);
     }
-    b.invulnerability = b.isPlayer ? .7 : .28;
-    b.x = (b.x + a.facing * a.attack.knockback).clamp(config.minX, config.maxX);
-    b.enter(b.alive ? FighterState.hurt : FighterState.dead);
-    if (a.isPlayer) {
+    b.invulnerability = b.hitInvulnerability;
+    b.x = (b.x + a.facing * a.attack.knockback * b.knockbackMultiplier)
+        .clamp(config.minX, config.maxX);
+    b.reactToHit(a.attack);
+    if (identical(a, player)) {
       hits++;
       if (b.alive &&
           a.attack == AttackSpec.frontKick &&
-          a.comboTargetId == null) {
-        a.comboTargetId = b.id;
-        a.nextComboAttack = AttackSpec.highKick;
-        a.comboWindow = .42;
+          player.comboTargetId == null) {
+        player.comboTargetId = b.id;
+        player.nextComboAttack = AttackSpec.highKick;
+        player.comboWindow = .42;
       } else if (b.alive &&
           a.attack == AttackSpec.highKick &&
-          a.comboTargetId == b.id) {
-        a.nextComboAttack = AttackSpec.veryHighKick;
-        a.comboWindow = .42;
+          player.comboTargetId == b.id) {
+        player.nextComboAttack = AttackSpec.veryHighKick;
+        player.comboWindow = .42;
       }
     }
   }

@@ -3,12 +3,23 @@ import 'package:flame/components.dart';
 import '../model/fighter_model.dart';
 import '../handlers/fighter_animation_handler.dart';
 
-class FighterEntity extends PositionComponent {
-  final FighterModel model;
-  final FighterAnimationHandler animations;
+abstract class FighterEntity<M extends FighterModel> extends PositionComponent {
+  final M model;
+  final FighterAnimationHandler<M> animations;
   final bool Function() showDebug;
   double elapsed = 0;
   FighterEntity(this.model, this.animations, this.showDebug);
+  bool get visible => true;
+  bool get blink => false;
+  int get sourceFacing => 1;
+
+  void transformSprite(Canvas canvas) {
+    canvas.translate(0, -model.elevation.roundToDouble());
+    canvas.scale(model.facing.toDouble() * sourceFacing, 1);
+  }
+
+  void renderStatus(Canvas canvas, Vector2 size, Paint paint) {}
+
   @override
   void update(double dt) {
     super.update(dt);
@@ -19,7 +30,7 @@ class FighterEntity extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    if (!model.isPlayer && model.deathReactionFinished) {
+    if (!visible) {
       return;
     }
     final sprite = animations.frame(model, elapsed);
@@ -32,17 +43,10 @@ class FighterEntity extends PositionComponent {
     canvas.drawRect(Rect.fromLTWH(shadowLeft, -1, shadowWidth, 2), paint);
     canvas.drawRect(
         Rect.fromLTWH(shadowLeft + 2, -2, shadowWidth - 4, 4), paint);
-    // Mosquito hit/death art must stay visible; invulnerability is still
-    // enforced by combat. Only Jaan uses the older blinking feedback.
-    final blink = model.isPlayer &&
-        model.alive &&
-        model.invulnerability > 0 &&
-        (elapsed * 24).floor().isEven;
     if (!blink) {
       final drawnSize = size;
       canvas.save();
-      canvas.translate(0, -model.elevation.roundToDouble());
-      canvas.scale(model.facing.toDouble(), 1);
+      transformSprite(canvas);
       sprite.render(canvas,
           position: Vector2((-drawnSize.x / 2).floorToDouble(), -drawnSize.y),
           size: drawnSize,
@@ -51,27 +55,7 @@ class FighterEntity extends PositionComponent {
             ..isAntiAlias = false);
       canvas.restore();
     }
-    if (!model.isPlayer && model.alive) {
-      canvas.save();
-      canvas.translate(0, -model.elevation.roundToDouble());
-      paint.color = const Color(0xFF000000);
-      canvas.drawRect(Rect.fromLTWH(-10, -size.y - 5, 20, 3), paint);
-      paint.color = const Color(0xFFFF55FF);
-      canvas.drawRect(
-          Rect.fromLTWH(-9, -size.y - 4,
-              (18 * model.health / model.maxHealth).roundToDouble(), 1),
-          paint);
-      if (model.state == FighterState.startup) {
-        canvas.drawRect(Rect.fromLTWH(-2, -size.y - 13, 4, 5), paint);
-        canvas.drawRect(Rect.fromLTWH(-2, -size.y - 7, 4, 1), paint);
-      }
-      if (model.state == FighterState.hurt && model.lastHitCritical) {
-        paint.color = const Color(0xFFFFFFFF);
-        canvas.drawRect(Rect.fromLTWH(-3, -size.y - 12, 6, 2), paint);
-        canvas.drawRect(Rect.fromLTWH(-1, -size.y - 14, 2, 6), paint);
-      }
-      canvas.restore();
-    }
+    renderStatus(canvas, size, paint);
     if (showDebug()) {
       paint
         ..color = const Color(0xFFFF55FF)

@@ -11,6 +11,9 @@ import 'package:kuradi_saased/game/states/score/view/score_screen_view.dart';
 import 'package:kuradi_saased/game/states/end/views/end_screen_view.dart';
 import 'package:kuradi_saased/game/states/pause/views/pause_view.dart';
 import 'package:kuradi_saased/game/states/arena/view/arena_view.dart';
+import 'package:kuradi_saased/game/states/arena/view/player_entity.dart';
+import 'package:kuradi_saased/game/states/arena/view/mosquito_entity.dart';
+import 'package:kuradi_saased/game/states/arena/view/grunt_entity.dart';
 import 'package:kuradi_saased/gamefsm/game_fsm.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
 import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
@@ -34,9 +37,15 @@ void main() {
     expect(campaign.totalScore, 800);
     campaign.recordResult(const LevelResult(
         cleared: true, hits: 21, defeated: 7, healthRemaining: 4));
+    expect(campaign.canAdvance, isTrue);
+    expect(campaign.totalScore, 1810);
+    expect(campaign.advance(), isTrue);
+    expect(campaign.level.gruntCount, 2);
+    campaign.recordResult(const LevelResult(
+        cleared: true, hits: 30, defeated: 7, healthRemaining: 2));
     expect(campaign.completed, isTrue);
     expect(campaign.advance(), isFalse);
-    expect(campaign.totalScore, 1810);
+    expect(campaign.totalScore, 2860);
     campaign.reset();
     expect(campaign.levelIndex, 0);
     expect(campaign.totalScore, 0);
@@ -147,6 +156,16 @@ void main() {
     expect(game.fsm.phase, GlobalGameState.level);
     expect(game.campaign.levelIndex, 1);
     expect(game.combat.enemies.length, 7);
+    final secondArena = game.world as ArenaView;
+    expect(secondArena.children.whereType<PlayerEntity>().single.model,
+        same(game.combat.player));
+    expect(secondArena.children.whereType<MosquitoEntity>(), hasLength(7));
+    expect(secondArena.children.whereType<GruntEntity>(), isEmpty);
+    expect(
+        game.combat.enemies
+            .whereType<MosquitoModel>()
+            .where((m) => m.rank == MosquitoRank.veteran),
+        hasLength(1));
     expect(game.combat.player.health, 8);
     expect(game.levelEnding.active, isFalse);
     expect(game.combatInputEnabled.value, isTrue);
@@ -167,7 +186,30 @@ void main() {
       game.update(.1);
     }
     expect(game.fsm.phase, GlobalGameState.score);
-    await game.continueFromScore();
+    await tester.runAsync(() => game.continueFromScore());
+    await tester.runAsync(() => game.ready());
+    await tester.pump();
+    expect(game.fsm.phase, GlobalGameState.level);
+    expect(game.campaign.levelIndex, 2);
+    final thirdArena = game.world as ArenaView;
+    expect(thirdArena.children.whereType<GruntEntity>(), hasLength(2));
+    expect(thirdArena.children.whereType<MosquitoEntity>(), hasLength(5));
+    for (final entity in thirdArena.children.whereType<GruntEntity>()) {
+      expect(game.combat.enemies, contains(same(entity.model)));
+    }
+    expect(game.combat.enemies.where((e) => e.kind == FighterKind.grunt),
+        hasLength(2));
+    expect(game.combat.enemies.where((e) => e.kind != FighterKind.grunt),
+        hasLength(5));
+    for (final enemy in game.combat.enemies) {
+      enemy.health = 0;
+      enemy.enter(FighterState.dead);
+    }
+    for (var i = 0; i < 30; i++) {
+      game.update(.1);
+    }
+    expect(game.fsm.phase, GlobalGameState.score);
+    await tester.runAsync(() => game.continueFromScore());
     await tester.runAsync(() => game.ready());
     await tester.pump();
     expect(game.fsm.phase, GlobalGameState.end);
@@ -205,7 +247,7 @@ void main() {
       game.update(.1);
     }
     expect(game.fsm.phase, GlobalGameState.score);
-    await game.continueFromScore();
+    await tester.runAsync(() => game.continueFromScore());
     await tester.runAsync(() => game.ready());
     await tester.pump();
     expect(game.fsm.phase, GlobalGameState.end);

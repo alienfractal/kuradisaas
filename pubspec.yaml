@@ -15,12 +15,18 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  build_runner: ^2.4.14
+  flutter_gen_runner: 5.12.0
+  # Shader reference builder: FlutterGen 5.12 reads assets, not shaders.
+  build: ^2.4.2
+  yaml: ^3.1.3
 flutter:
   uses-material-design: true
   assets:
-    # Includes scenery, fighters, menu/lore art and shared settings icon sheets.
+    # Scenery, fighters, menu/lore, reference sprite-button art and settings icons.
     - resources/images/
     - resources/sound/
+    - resources/fonts/
   shaders:
     - resources/shaders/crt.frag
   fonts:

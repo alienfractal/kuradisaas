@@ -4,6 +4,16 @@ Like Revalia Obscura and CoolorBurn, entering the outer Menu state selects a
 Flame World for the camera. Kuradi now has a small `GameMenuFsm` inside that
 outer state, so the intro screens do not become combat or campaign states.
 
+The equivalent of the reference's outer `GameMenu` state is
+`GlobalGameState.menu`. `GameMenuFsm` is its nested Intro/Logo/Main/Lore flow.
+Each transition calls the old substate's exit before entering the new one.
+Leaving the outer Menu calls `leave()`, disabling its timer and menu input;
+returning calls `begin()` again. State entry selects a world and injects
+`MenuCacheService`, including the sprite-button skins for Start, Lore and Back.
+
+All outer states have explicit sprite-service entries in
+`KuradiSaased.stateSpriteServices`; see the ownership table in architecture.md.
+
 | Menu state | View | Transition |
 | --- | --- | --- |
 | intro | `MenuIntroView`, frame 0 | Any new key down, click, or tap |

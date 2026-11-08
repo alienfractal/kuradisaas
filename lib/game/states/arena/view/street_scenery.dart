@@ -17,15 +17,15 @@ class StreetScenery extends Component with HasGameReference<KuradiSaased> {
   @override
   Future<void> onLoad() async {
     stars = SpriteAnimationComponent(
-      animation: SpriteAnimation.spriteList(cache.stars, stepTime: .3),
+      animation: cache.starsAnimation.createAnimation(),
       size: Vector2(640, 320),
       paint: _paint,
     );
     await addAll([
       stars,
       SpriteComponent(
-          sprite: cache.street,
-          size: Vector2(640, 320),
+          sprite: cache.streetSpec.sprite,
+          size: cache.streetSpec.imgSize,
           paint: _paint,
           priority: 1)
     ]);

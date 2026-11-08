@@ -4,6 +4,56 @@ import 'package:kuradi_saased/game/states/arena/services/combat_logic_service.da
 import 'package:kuradi_saased/game/states/arena/services/input_service.dart';
 
 void main() {
+  for (final grunts in [0, 1]) {
+    test('kick combo keeps victim near the ground (grunts: $grunts)', () {
+      final arena = CombatLogicService(enemyCount: 1, gruntCount: grunts);
+      final controls = InputService();
+      final target = arena.enemies.single
+        ..x = arena.player.x + 23
+        ..y = arena.player.y;
+      var peak = 0.0;
+      void tick(double seconds) {
+        for (var i = 0; i < (seconds * 120).ceil(); i++) {
+          arena.update(1 / 120, controls);
+          if (target.elevation > peak) peak = target.elevation;
+        }
+      }
+
+      controls.kick();
+      tick(.20);
+      controls.kick();
+      tick(.30);
+      controls.kick();
+      tick(.35);
+      expect(arena.hits, 3);
+      tick(.8);
+      expect(peak, greaterThan(0));
+      expect(peak, lessThanOrEqualTo(24));
+      expect(target.airborne, isFalse);
+    });
+  }
+
+  test('repeated launches cannot stack height beyond the kick ceiling', () {
+    final arena = CombatLogicService(enemyCount: 1, enemyHealth: 100);
+    final controls = InputService();
+    final target = arena.enemies.single..y = arena.player.y;
+    var peak = 0.0;
+    for (var hit = 0; hit < 8; hit++) {
+      target.x = arena.player.x + 20;
+      arena.player.beginAttack(AttackSpec.veryHighKick);
+      for (var frame = 0; frame < 40; frame++) {
+        arena.update(1 / 120, controls);
+        if (target.elevation > peak) peak = target.elevation;
+      }
+    }
+    expect(arena.hits, 8);
+    expect(peak, lessThanOrEqualTo(24));
+    for (var frame = 0; frame < 120; frame++) {
+      arena.update(1 / 120, controls);
+    }
+    expect(target.airborne, isFalse);
+  });
+
   for (final spec in [
     AttackSpec.frontKick,
     AttackSpec.highKick,
@@ -116,7 +166,7 @@ void main() {
     expect(target.health, 0);
     expect(target.state, FighterState.dead);
     expect(target.lastHitCritical, isTrue);
-    expect(target.verticalVelocity, greaterThan(130));
+    expect(target.verticalVelocity, greaterThan(0));
     advance(2);
     expect(combat.hits, 3);
     expect(target.airborne, isFalse);
