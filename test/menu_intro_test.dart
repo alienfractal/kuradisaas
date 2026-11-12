@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kuradi_saased/gamefsm/game_menu_fsm.dart';
 import 'package:kuradi_saased/gamefsm/game_fsm.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
-import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
+import 'package:kuradi_saased/audio/game_audio_backend.dart';
 import 'package:kuradi_saased/game/states/main_menu/views/menu_intro_view.dart';
 import 'package:kuradi_saased/game/states/main_menu/views/main_menu_view.dart';
 import 'package:kuradi_saased/game/states/main_menu/views/lore_view.dart';
@@ -31,7 +31,7 @@ void main() {
 
   testWidgets('a tap anywhere, including the black margin, reveals the logo',
       (tester) async {
-    final game = KuradiSaased(audioPlayer: SilentAudioPlayer());
+    final game = KuradiSaased(audioPlayer: SilentAudioBackend());
     await tester.runAsync(() async {
       await tester.pumpWidget(MaterialApp(home: GameWidget(game: game)));
       await game.loaded;
@@ -88,7 +88,7 @@ void main() {
   testWidgets(
       'LORE opens its animated world and supports button/keyboard return',
       (tester) async {
-    final game = KuradiSaased(audioPlayer: SilentAudioPlayer());
+    final game = KuradiSaased(audioPlayer: SilentAudioBackend());
     await tester.runAsync(() async {
       await tester.pumpWidget(MaterialApp(home: GameWidget(game: game)));
       await game.loaded;

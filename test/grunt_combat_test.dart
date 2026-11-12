@@ -40,22 +40,23 @@ void main() {
       final input = InputService();
       final player = combat.player..facing = facing;
       final grunt = combat.enemies.single
-        ..x = player.x + facing * AttackSpec.frontKick.reach
+        ..x = player.x + facing * AttackSpec.midKick.reach
         ..y = player.y
         ..hitStunDuration = 5
         ..enter(FighterState.hurt);
       final startX = grunt.x;
       input.kick();
       tick(combat, input, .2);
-      expect(grunt.health, 11);
-      expect((grunt.x - startX).abs(), closeTo(3, .001));
-      input.kick();
-      tick(combat, input, .3);
-      expect(grunt.health, 9);
+      expect(grunt.health, 10);
+      expect((grunt.x - startX).abs(), closeTo(1.25, .001));
+      final beforeHeavyKick = grunt.x;
       input.kick();
       tick(combat, input, .35);
-      expect(grunt.health, 6);
-      expect(combat.hits, 3);
+      expect(grunt.health, 7);
+      expect((grunt.x - beforeHeavyKick) * facing, inExclusiveRange(0, 8));
+      tick(combat, input, .22);
+      expect(grunt.x - beforeHeavyKick, closeTo(facing * 8, .001));
+      expect(combat.hits, 2);
       expect(player.x, 80, reason: 'Follow-ups should not require chasing');
     });
   }
@@ -124,7 +125,7 @@ void main() {
       ..beginAttack(AttackSpec.gruntHeavy)
       ..enter(FighterState.active);
     player
-      ..queueAttack(AttackSpec.frontKick)
+      ..queueAttack(AttackSpec.midKick)
       ..beginJump();
     combat.update(1 / 120, input);
     expect(player.health, 6);
@@ -167,7 +168,7 @@ void main() {
     expect(combat.endingAnimationsFinished, isTrue);
   });
 
-  test('grunt sheets, background key and knockdown animation sample correctly',
+  test('grunt sheets use native frame sizes and transparent backgrounds',
       () async {
     final cache = FighterCacheService();
     addTearDown(cache.dispose);
@@ -175,9 +176,11 @@ void main() {
     addTearDown(game.images.clearCache);
     await cache.preload(game);
     for (final asset in [
-      Assets.resources.images.mosquitoGruntAnimationIdleSmall47x587,
-      Assets.resources.images.mosquitoGruntAnimationLightAttackSmall47x584,
-      Assets.resources.images.mosquitoGruntAnimationHeavyAttackSmall47x584,
+      Assets.resources.images.gruntIdle47x587,
+      Assets.resources.images.gruntAttackLight47x584,
+      Assets.resources.images.gruntAttackHeavy47x584,
+      Assets.resources.images.gruntMosquitoDead47x587,
+      Assets.resources.images.gruntFatal47x5815,
     ]) {
       expect(game.images.containsKey(asset.path), isTrue);
     }
@@ -185,38 +188,32 @@ void main() {
     expect(cache.gruntLight, hasLength(4));
     expect(cache.gruntHeavy, hasLength(4));
     expect(cache.gruntKo, hasLength(7));
-    expect(cache.gruntDead, hasLength(12));
-    for (final frames in [
-      cache.gruntIdle,
-      cache.gruntLight,
-      cache.gruntHeavy
+    expect(cache.gruntDead, hasLength(15));
+    final handler = GruntAnimationHandler(cache);
+    final combat = CombatLogicService(enemyCount: 1, gruntCount: 1);
+    final grunt = combat.enemies.whereType<GruntModel>().single;
+    for (final (frames, widths, height) in [
+      (cache.gruntIdle, List.filled(7, 47), 58),
+      (cache.gruntLight, [48, 47, 48, 47], 58),
+      (cache.gruntHeavy, List.filled(4, 47), 59),
+      (cache.gruntKo, List.filled(7, 47), 58),
+      (cache.gruntDead, List.filled(15, 47), 58),
     ]) {
       final pixels = (await frames.first.image
           .toByteData(format: ui.ImageByteFormat.rawRgba))!;
       expect(pixels.buffer.asUint8List(pixels.offsetInBytes, 4), [0, 0, 0, 0]);
-    }
-    for (final frames in [
-      cache.gruntIdle,
-      cache.gruntLight,
-      cache.gruntHeavy
-    ]) {
-      for (final frame in frames) {
-        expect(frame.srcSize, Vector2(47, 58));
-        expect(frame.image.width, frames.length * 47);
-        expect(frame.image.height, 58);
+      var left = 0.0;
+      for (var index = 0; index < frames.length; index++) {
+        final frame = frames[index];
+        expect(frame.srcPosition, Vector2(left, 0));
+        expect(frame.srcSize,
+            Vector2(widths[index].toDouble(), height.toDouble()));
+        expect(handler.displaySize(grunt, frame), frame.srcSize);
+        expect(frame.image.height, height);
+        left += frame.srcSize.x;
       }
+      expect(left, frames.first.image.width);
     }
-    for (final frames in [cache.gruntKo, cache.gruntDead]) {
-      for (final frame in frames) {
-        expect(frame.srcSize, Vector2(32, 40));
-        expect(frame.image.width, frames.length * 32);
-        expect(frame.image.height, 40);
-      }
-    }
-    final handler = GruntAnimationHandler(cache);
-    final combat = CombatLogicService(enemyCount: 1, gruntCount: 1);
-    final grunt = combat.enemies.whereType<GruntModel>().single;
-    expect(handler.displaySize(grunt, cache.gruntIdle.first), Vector2(47, 58));
     for (final spec in [AttackSpec.gruntLight, AttackSpec.gruntHeavy]) {
       grunt.beginAttack(spec);
       final frames =
@@ -231,13 +228,17 @@ void main() {
     }
     final playerHandler = PlayerAnimationHandler(cache);
     final player = combat.player..enter(FighterState.knockedDown);
-    expect(playerHandler.frame(player, 99), same(cache.playerDead.first));
+    expect(cache.playerKo, hasLength(6));
+    final firstKo = playerHandler.frame(player, 99);
+    expect(firstKo, same(cache.playerKo.first));
+    expect(playerHandler.displaySize(player, firstKo), Vector2(46, 58));
+    expect(playerHandler.groundPadding(firstKo), 12);
     player.stateTime = .95;
-    expect(playerHandler.frame(player, 99), same(cache.playerDead.last));
+    expect(playerHandler.frame(player, 99), same(cache.playerKo.last));
     player.enter(FighterState.gettingUp);
-    expect(playerHandler.frame(player, 99), same(cache.playerDead.last));
+    expect(playerHandler.frame(player, 99), same(cache.playerKo.last));
     player.stateTime = PlayerModel.getUpDuration - .001;
-    expect(playerHandler.frame(player, 99), same(cache.playerDead.first));
+    expect(playerHandler.frame(player, 99), same(cache.playerKo.first));
   });
 
   test('grunt critical KO falls, gets up, and lethal hits use death frames',
@@ -255,10 +256,8 @@ void main() {
     tick(combat, input, .2);
     expect(cache.gruntKo.take(3), contains(handler.frame(grunt, 99)));
     input.kick();
-    tick(combat, input, .3);
-    input.kick();
     tick(combat, input, .35);
-    expect(grunt.health, 6);
+    expect(grunt.health, 7);
     expect(grunt.lastHitCritical, isTrue);
     expect(cache.gruntKo, contains(handler.frame(grunt, 99)));
     tick(combat, input, .55);
@@ -283,7 +282,7 @@ void main() {
     tick(combat, input, .1);
     expect(grunt.state, FighterState.dead);
     expect(handler.frame(grunt, 99), same(cache.gruntDead.first));
-    tick(combat, input, .88);
+    tick(combat, input, .90);
     expect(handler.frame(grunt, 99), same(cache.gruntDead.last));
     expect(combat.endingAnimationsFinished, isFalse);
     tick(combat, input, .1);

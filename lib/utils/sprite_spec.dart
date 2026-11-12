@@ -7,7 +7,8 @@ class SpriteSheetSpec {
   const SpriteSheetSpec(this.width, this.height, this.frames);
 
   factory SpriteSheetSpec.fromPath(String path) {
-    final match = RegExp(r'[_-](\d+)x(\d+)t?-(\d+)\.png$', caseSensitive: false)
+    final match = RegExp(r'[_-](\d+)x(\d+)t?-(\d+)(?:-sheet)?\.png$',
+            caseSensitive: false)
         .firstMatch(path);
     if (match == null) throw FormatException('Missing sheet dimensions: $path');
     final values = [for (var i = 1; i <= 3; i++) int.parse(match.group(i)!)];

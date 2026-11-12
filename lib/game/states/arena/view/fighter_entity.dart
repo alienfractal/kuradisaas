@@ -35,6 +35,7 @@ abstract class FighterEntity<M extends FighterModel> extends PositionComponent {
     }
     final sprite = animations.frame(model, elapsed);
     final size = animations.displaySize(model, sprite);
+    final heightAboveGround = size.y - animations.groundPadding(sprite);
     final paint = Paint()
       ..color = const Color(0xFF000000)
       ..isAntiAlias = false;
@@ -44,12 +45,11 @@ abstract class FighterEntity<M extends FighterModel> extends PositionComponent {
     canvas.drawRect(
         Rect.fromLTWH(shadowLeft + 2, -2, shadowWidth - 4, 4), paint);
     if (!blink) {
-      final drawnSize = size;
       canvas.save();
       transformSprite(canvas);
       sprite.render(canvas,
-          position: Vector2((-drawnSize.x / 2).floorToDouble(), -drawnSize.y),
-          size: drawnSize,
+          position: Vector2((-size.x / 2).floorToDouble(), -heightAboveGround),
+          size: size,
           overridePaint: Paint()
             ..filterQuality = FilterQuality.none
             ..isAntiAlias = false);
@@ -63,9 +63,9 @@ abstract class FighterEntity<M extends FighterModel> extends PositionComponent {
       canvas.drawRect(
           Rect.fromLTWH(
               -FighterModel.hurtHalfWidth,
-              -size.y - model.elevation.roundToDouble(),
+              -heightAboveGround - model.elevation.roundToDouble(),
               FighterModel.hurtHalfWidth * 2,
-              size.y),
+              heightAboveGround),
           paint);
       if (model.attacking) {
         paint.color = model.state == FighterState.active

@@ -12,5 +12,6 @@ abstract class FighterAnimationHandler<M extends FighterModel> {
   FighterAnimationHandler(this.cache);
 
   Vector2 displaySize(M model, Sprite sprite);
+  double groundPadding(Sprite sprite) => 0;
   Sprite frame(M model, double elapsed);
 }

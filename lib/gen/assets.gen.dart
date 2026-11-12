@@ -59,6 +59,33 @@ class $ResourcesImagesGen {
   /// File path: resources/images/enemies.aseprite
   String get enemies => 'resources/images/enemies.aseprite';
 
+  /// File path: resources/images/grunt-attack-heavy-47x58-4.png
+  AssetGenImage get gruntAttackHeavy47x584 =>
+      const AssetGenImage('resources/images/grunt-attack-heavy-47x58-4.png');
+
+  /// File path: resources/images/grunt-attack-light-47x58-4.png
+  AssetGenImage get gruntAttackLight47x584 =>
+      const AssetGenImage('resources/images/grunt-attack-light-47x58-4.png');
+
+  /// File path: resources/images/grunt-fatal-47x58-15.png
+  AssetGenImage get gruntFatal47x5815 =>
+      const AssetGenImage('resources/images/grunt-fatal-47x58-15.png');
+
+  /// File path: resources/images/grunt-idle-47x58-7.png
+  AssetGenImage get gruntIdle47x587 =>
+      const AssetGenImage('resources/images/grunt-idle-47x58-7.png');
+
+  /// File path: resources/images/grunt-mosquito-dead-47x58-7.png
+  AssetGenImage get gruntMosquitoDead47x587 =>
+      const AssetGenImage('resources/images/grunt-mosquito-dead-47x58-7.png');
+
+  /// File path: resources/images/grunt-mosquito-dead.aseprite
+  String get gruntMosquitoDead =>
+      'resources/images/grunt-mosquito-dead.aseprite';
+
+  /// File path: resources/images/gruntmosquitodead.aseprite
+  String get gruntmosquitodead => 'resources/images/gruntmosquitodead.aseprite';
+
   /// File path: resources/images/jaan_jump_24x24-5-sheet.png
   AssetGenImage get jaanJump24x245Sheet =>
       const AssetGenImage('resources/images/jaan_jump_24x24-5-sheet.png');
@@ -152,8 +179,12 @@ class $ResourcesImagesGen {
       const AssetGenImage(
           'resources/images/mosquito-grunt-animation-heavy-attack-95x119-4.png');
 
+  /// File path: resources/images/mosquito-grunt-animation-heavy-attack-small-47x58-4.aseprite
+  String get mosquitoGruntAnimationHeavyAttackSmall47x584Aseprite =>
+      'resources/images/mosquito-grunt-animation-heavy-attack-small-47x58-4.aseprite';
+
   /// File path: resources/images/mosquito-grunt-animation-heavy-attack-small-47x58-4.png
-  AssetGenImage get mosquitoGruntAnimationHeavyAttackSmall47x584 =>
+  AssetGenImage get mosquitoGruntAnimationHeavyAttackSmall47x584Png =>
       const AssetGenImage(
           'resources/images/mosquito-grunt-animation-heavy-attack-small-47x58-4.png');
 
@@ -181,36 +212,17 @@ class $ResourcesImagesGen {
       const AssetGenImage(
           'resources/images/mosquito-grunt-animation-light-attack-small-47x58-4.png');
 
-  /// File path: resources/images/mosquito-grunt-animation.aseprite
-  String get mosquitoGruntAnimation =>
-      'resources/images/mosquito-grunt-animation.aseprite';
-
-  /// File path: resources/images/mosquito-grunt-dead1-95x119-12.aseprite
-  String get mosquitoGruntDead195x11912 =>
-      'resources/images/mosquito-grunt-dead1-95x119-12.aseprite';
-
-  /// File path: resources/images/mosquito-grunt-dead1n.aseprite
-  String get mosquitoGruntDead1n =>
-      'resources/images/mosquito-grunt-dead1n.aseprite';
-
   /// File path: resources/images/mosquito-grunt-death1-95x119-12.png
   AssetGenImage get mosquitoGruntDeath195x11912 => const AssetGenImage(
       'resources/images/mosquito-grunt-death1-95x119-12.png');
 
-  /// File path: resources/images/mosquito-grunt-ko-95x119-7.aseprite
-  String get mosquitoGruntKo95x1197Aseprite =>
-      'resources/images/mosquito-grunt-ko-95x119-7.aseprite';
-
   /// File path: resources/images/mosquito-grunt-ko-95x119-7.png
-  AssetGenImage get mosquitoGruntKo95x1197Png =>
+  AssetGenImage get mosquitoGruntKo95x1197 =>
       const AssetGenImage('resources/images/mosquito-grunt-ko-95x119-7.png');
 
-  /// File path: resources/images/mosquito-grunt-ko.aseprite
-  String get mosquitoGruntKo => 'resources/images/mosquito-grunt-ko.aseprite';
-
-  /// File path: resources/images/mosquito-grunt-tsppingthefloorn.aseprite
-  String get mosquitoGruntTsppingthefloorn =>
-      'resources/images/mosquito-grunt-tsppingthefloorn.aseprite';
+  /// File path: resources/images/mosquito-grunt-tsppingthefloorn-reduced.aseprite
+  String get mosquitoGruntTsppingthefloornReduced =>
+      'resources/images/mosquito-grunt-tsppingthefloorn-reduced.aseprite';
 
   /// File path: resources/images/mosquito-grunt.aseprite
   String get mosquitoGrunt => 'resources/images/mosquito-grunt.aseprite';
@@ -225,6 +237,38 @@ class $ResourcesImagesGen {
   /// File path: resources/images/musicfx-volume.png
   AssetGenImage get musicfxVolume =>
       const AssetGenImage('resources/images/musicfx-volume.png');
+
+  /// File path: resources/images/new-jan-animation-jump-46x58-2.png
+  AssetGenImage get newJanAnimationJump46x582 => const AssetGenImage(
+      'resources/images/new-jan-animation-jump-46x58-2.png');
+
+  /// File path: resources/images/new-jan-animationko-48x56-6.png
+  AssetGenImage get newJanAnimationko48x566 =>
+      const AssetGenImage('resources/images/new-jan-animationko-48x56-6.png');
+
+  /// File path: resources/images/new-jan-animationko.aseprite
+  String get newJanAnimationko =>
+      'resources/images/new-jan-animationko.aseprite';
+
+  /// File path: resources/images/new-jan-animationwalking-46x58-7.png
+  AssetGenImage get newJanAnimationwalking46x587 => const AssetGenImage(
+      'resources/images/new-jan-animationwalking-46x58-7.png');
+
+  /// File path: resources/images/new-jan-hkick-46x58-5.png
+  AssetGenImage get newJanHkick46x585 =>
+      const AssetGenImage('resources/images/new-jan-hkick-46x58-5.png');
+
+  /// File path: resources/images/new-jan-lkick-46x58-1.png
+  AssetGenImage get newJanLkick46x581 =>
+      const AssetGenImage('resources/images/new-jan-lkick-46x58-1.png');
+
+  /// File path: resources/images/new-jan-mkick-46x58-3.png
+  AssetGenImage get newJanMkick46x583 =>
+      const AssetGenImage('resources/images/new-jan-mkick-46x58-3.png');
+
+  /// File path: resources/images/new-jan-mpunch-46x58-5.png
+  AssetGenImage get newJanMpunch46x585 =>
+      const AssetGenImage('resources/images/new-jan-mpunch-46x58-5.png');
 
   /// File path: resources/images/scenariot-wide-front-street-house_640x320-1.png
   AssetGenImage get scenariotWideFrontStreetHouse640x3201 =>
@@ -254,6 +298,13 @@ class $ResourcesImagesGen {
         crton32x328,
         enemiesColor,
         enemies,
+        gruntAttackHeavy47x584,
+        gruntAttackLight47x584,
+        gruntFatal47x5815,
+        gruntIdle47x587,
+        gruntMosquitoDead47x587,
+        gruntMosquitoDead,
+        gruntmosquitodead,
         jaanJump24x245Sheet,
         jaanJump61x995,
         jaanPunch108x984,
@@ -277,24 +328,28 @@ class $ResourcesImagesGen {
         jannWalk92x998,
         mosquitoDead32x32t7,
         mosquitoGruntAnimationHeavyAttack95x1194,
-        mosquitoGruntAnimationHeavyAttackSmall47x584,
+        mosquitoGruntAnimationHeavyAttackSmall47x584Aseprite,
+        mosquitoGruntAnimationHeavyAttackSmall47x584Png,
         mosquitoGruntAnimationIdle95x1197,
         mosquitoGruntAnimationIdleSmall47x587,
         mosquitoGruntAnimationIdleSmall95x1197,
         mosquitoGruntAnimationLightAttack95x1194,
         mosquitoGruntAnimationLightAttackSmall47x584,
-        mosquitoGruntAnimation,
-        mosquitoGruntDead195x11912,
-        mosquitoGruntDead1n,
         mosquitoGruntDeath195x11912,
-        mosquitoGruntKo95x1197Aseprite,
-        mosquitoGruntKo95x1197Png,
-        mosquitoGruntKo,
-        mosquitoGruntTsppingthefloorn,
+        mosquitoGruntKo95x1197,
+        mosquitoGruntTsppingthefloornReduced,
         mosquitoGrunt,
         mosquitoHit32x325,
         mosquitoHit,
         musicfxVolume,
+        newJanAnimationJump46x582,
+        newJanAnimationko48x566,
+        newJanAnimationko,
+        newJanAnimationwalking46x587,
+        newJanHkick46x585,
+        newJanLkick46x581,
+        newJanMkick46x583,
+        newJanMpunch46x585,
         scenariotWideFrontStreetHouse640x3201,
         scenariotWideStars640x3203,
         scenariotWide,

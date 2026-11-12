@@ -3,13 +3,15 @@ import '../game/states/arena/model/combat_event.dart';
 import '../game/states/arena/model/fighter_model.dart';
 import '../game/states/arena/services/combat_logic_service.dart';
 import '../gamefsm/game_menu_fsm.dart';
-import 'audio_player_wrapper.dart';
-import 'game_sounds.dart';
+import 'game_audio_backend.dart';
 
 /// Routes model facts to sound. Playback never changes combat or menu state.
 class GameAudioService {
-  GameAudioService(this.player);
-  final AudioPlayerWrapper player;
+  GameAudioService(this._player);
+  final GameAudioBackend _player;
+  EffectsMode get effectsMode => _player.effectsMode;
+  Set<EffectsMode> get supportedEffectsModes => _player.supportedEffectsModes;
+  Future<void> setEffectsMode(EffectsMode mode) => _player.setEffectsMode(mode);
   bool _walking = false;
   bool _inLore = false;
   bool _suspended = false;
@@ -18,11 +20,15 @@ class GameAudioService {
 
   Future<void> setVolumes({required double effects, required double music}) =>
       Future.wait(
-          [player.setSoundFxVolume(effects), player.setMusicVolume(music)]);
+          [_player.setEffectsVolume(effects), _player.setMusicVolume(music)]);
 
-  Future<void> preload() => player.initSfxPool(GameSounds.effects);
+  Future<void> setEffectsVolume(double volume) =>
+      _player.setEffectsVolume(volume);
+  Future<void> setMusicVolume(double volume) => _player.setMusicVolume(volume);
+
+  Future<void> preload() => _player.preload();
   void notifyUserGesture() {
-    if (!_disposed) player.notifyUserGesture();
+    if (!_disposed) _player.notifyUserGesture();
   }
 
   void enterMenu(MenuState state) {
@@ -30,13 +36,13 @@ class GameAudioService {
     _suspended = false;
     stopWalking();
     if (state == MenuState.intro) {
-      unawaited(player.playMusic(GameSounds.logo));
+      unawaited(_player.playMusic(MusicCue.logo));
     } else if (state == MenuState.lore) {
       _inLore = true;
-      unawaited(player.playMusic(GameSounds.lore, loop: true));
+      unawaited(_player.playMusic(MusicCue.lore, loop: true));
     } else if (_inLore) {
       _inLore = false;
-      unawaited(player.stopMusic());
+      unawaited(_player.stopMusic());
     }
     // The startup sting may finish naturally on the main menu.
   }
@@ -50,15 +56,15 @@ class GameAudioService {
   void leaveScreen() {
     _inLore = false;
     stopWalking();
-    unawaited(player.stopMusic());
-    unawaited(player.stopSfx());
+    unawaited(_player.stopMusic());
+    unawaited(_player.stopEffects());
   }
 
   void suspend() {
     _suspended = true;
     stopWalking();
-    unawaited(player.stopMusic());
-    unawaited(player.stopSfx());
+    unawaited(_player.stopMusic());
+    unawaited(_player.stopEffects());
   }
 
   void resumeMenu(MenuState state) {
@@ -71,13 +77,13 @@ class GameAudioService {
     for (final event in combat.events) {
       switch (event.type) {
         case CombatEventType.jumpStarted:
-          player.playSoundFx(GameSounds.jump);
+          _player.playEffect(SoundCue.jump);
         case CombatEventType.attackStarted:
-          player.playSoundFx(GameSounds.attack);
+          _player.playEffect(SoundCue.attack);
         case CombatEventType.hitLanded:
-          player.playSoundFx(event.targetId == combat.player.id
-              ? GameSounds.hurt
-              : GameSounds.impact);
+          _player.playEffect(event.targetId == combat.player.id
+              ? SoundCue.hurt
+              : SoundCue.impact);
       }
     }
     final jaan = combat.player;
@@ -91,7 +97,7 @@ class GameAudioService {
     _y = jaan.y;
     if (walking && !_walking) {
       _walking = true;
-      unawaited(player.playWalking(GameSounds.walk));
+      _player.startWalking();
     } else if (!walking) {
       stopWalking();
     }
@@ -100,12 +106,12 @@ class GameAudioService {
   void stopWalking() {
     if (!_walking) return;
     _walking = false;
-    unawaited(player.stopWalking());
+    _player.stopWalking();
   }
 
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    await player.dispose();
+    await _player.dispose();
   }
 }

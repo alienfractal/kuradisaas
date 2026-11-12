@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:kuradi_saased/gen/assets.gen.dart';
 import 'package:kuradi_saased/gen/fonts.gen.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
-import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
+import 'package:kuradi_saased/audio/game_audio_backend.dart';
 import 'package:kuradi_saased/game/model/campaign_model.dart';
 import 'package:kuradi_saased/gamefsm/game_menu_fsm.dart';
 import 'package:kuradi_saased/game/states/arena/model/fighter_model.dart';
@@ -21,7 +21,7 @@ void main() {
         .load();
     final campaign = CampaignModel();
     final game =
-        KuradiSaased(campaign: campaign, audioPlayer: SilentAudioPlayer());
+        KuradiSaased(campaign: campaign, audioPlayer: SilentAudioBackend());
     game.onGameResize(Vector2(1024, 512));
     // ignore: invalid_use_of_internal_member
     await game.load();
@@ -128,10 +128,8 @@ void main() {
     game.input.kick();
     advance(.20);
     game.input.kick();
-    advance(.30);
-    game.input.kick();
-    advance(.42);
-    expect(game.combat.hits, 3);
+    advance(.40);
+    expect(game.combat.hits, 2);
     expect(victim.elevation, inExclusiveRange(10, 24));
     await snapshot('level-3-kick-launch');
     advance(.5);

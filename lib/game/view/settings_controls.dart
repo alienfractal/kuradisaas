@@ -5,19 +5,52 @@ import 'package:flame/events.dart';
 import 'package:flame/text.dart';
 import 'package:flutter/painting.dart';
 import '../../kuradi_saased.dart';
+import '../../audio/game_audio_backend.dart';
+import '../../utils/game_button.dart';
 
 enum SettingControl { effects, music, crt }
 
-/// The shared three-icon strip, reused by Main Menu and Pause.
+/// Shared volume/CRT icons and effect mode selector for Main Menu and Pause.
 class SettingsControls extends Component {
   SettingsControls(this.game);
   final KuradiSaased game;
   @override
   Future<void> onLoad() async {
+    if (game.audio.supportedEffectsModes.length > 1) {
+      await add(TextComponent(
+          text: 'SFX MODE',
+          position: Vector2(32, 89),
+          anchor: Anchor.topCenter,
+          textRenderer: TextPaint(
+              style: const TextStyle(
+                  fontFamily: FontFamily.arcade,
+                  fontSize: 4,
+                  color: CgaPalette.white))));
+      await add(EffectsModeButton(game));
+    }
     for (final kind in SettingControl.values) {
       await add(SettingsButton(game, kind,
           position: Vector2(8, 123 + kind.index * 25)));
     }
+  }
+}
+
+class EffectsModeButton extends GameButton {
+  EffectsModeButton(this.game)
+      : super('', () => game.toggleEffectsMode(),
+            skin: game.buttonCache.skin,
+            position: Vector2(32, 107),
+            size: Vector2(48, 18));
+
+  final KuradiSaased game;
+  @override
+  String get label =>
+      game.audio.effectsMode == EffectsMode.midi ? 'MIDI' : 'MP3';
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    game.notifyUserGesture();
+    super.onTapDown(event);
   }
 }
 

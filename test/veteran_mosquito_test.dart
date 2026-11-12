@@ -66,17 +66,41 @@ void main() {
     }
     combat.player.invulnerability = 10;
     final input = InputService();
-    for (var i = 0; i < 31; i++) {
+    for (var i = 0; i < 26; i++) {
       combat.update(1 / 120, input);
     }
     expect(veteran.state, FighterState.active);
     expect(regular.state, FighterState.startup);
+    for (var i = 0; i < 6; i++) {
+      combat.update(1 / 120, input);
+    }
+    expect(regular.state, FighterState.active);
     for (var i = 0; i < 570; i++) {
       combat.update(1 / 120, input);
     }
     expect(veteran.attackSerial, greaterThan(regular.attackSerial));
     expect(veteran.maxHealth, regular.maxHealth);
     expect(combat.player.health, 8);
+  });
+
+  test('veteran slips out of a kick lane and stings during recovery', () {
+    final combat = CombatLogicService(enemyCount: 1, veteranCount: 1);
+    final player = combat.player;
+    final veteran = combat.enemies.single
+      ..x = player.x + 24
+      ..y = player.y + 8;
+    final input = InputService()..kick();
+    for (var i = 0; i < 30; i++) {
+      combat.update(1 / 120, input);
+    }
+    expect(veteran.health, veteran.maxHealth);
+    expect(veteran.y - player.y, greaterThan(AttackSpec.midKick.laneTolerance));
+    expect(player.state, FighterState.recovery);
+    for (var i = 0; i < 51; i++) {
+      combat.update(1 / 120, input);
+    }
+    expect(player.health, player.maxHealth - 1);
+    expect(player.state, FighterState.hurt);
   });
 
   test('only a living veteran draws the yellow asterisk', () async {

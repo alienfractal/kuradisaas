@@ -126,36 +126,35 @@
       <caption>Timings (ms)</caption>
       <thead><tr><th>Attack</th><th>Damage</th><th>Startup</th><th>Active</th><th>Recovery</th></tr></thead>
       <tbody>
-        <tr><td>Punch</td><td>1</td><td>90</td><td>75</td><td>190</td></tr>
-        <tr><td>Front kick</td><td>1</td><td>140</td><td>100</td><td>480</td></tr>
-        <tr><td>High kick</td><td>2</td><td>120</td><td>100</td><td>500</td></tr>
-        <tr><td>Very-high kick</td><td>3 (critical)</td><td>160</td><td>100</td><td>650</td></tr>
-        <tr><td>Mosquito sting</td><td>1</td><td>300</td><td>100</td><td>450</td></tr>
+        <tr><td>Punch</td><td>1</td><td>70</td><td>75</td><td>190</td></tr>
+        <tr><td>Mid kick</td><td>2</td><td>120</td><td>100</td><td>500</td></tr>
+        <tr><td>High kick</td><td>3 (critical)</td><td>160</td><td>100</td><td>650</td></tr>
+        <tr><td>Mosquito sting</td><td>1</td><td>240</td><td>100</td><td>360</td></tr>
+        <tr><td>Veteran sting</td><td>1</td><td>180</td><td>100</td><td>280</td></tr>
       </tbody>
     </table></div>
   </section>
   <section class="guide-section" id="kick-combo">
-    <h3>02 / R → R → R</h3>
+    <h3>02 / PUNCH AND KICK LINKS</h3>
     <!-- DIAGRAM:kick-combo -->
-    <p>Front kick must hit a surviving enemy to confirm High. High must then hit that <strong>same enemy</strong> to confirm Very high. Each confirmation lasts <strong>420 ms from contact</strong>. A follow-up also needs a fresh R request still inside its 160 ms input buffer.</p>
-    <p>Front can transition after <strong>80 ms of recovery</strong>; High after <strong>100 ms of recovery</strong>. Startup and Active still run normally. Starting the next stage consumes its confirmation, so a missed High cannot reuse the old Front hit.</p>
-    <p>Miss, timeout, receiving damage, or starting Punch resets the chain. An early request can expire before the transition; holding R cannot play the whole combo. Without a valid follow-up, the normal recovery applies.</p>
+    <p>Tap R to start a mid kick. A grounded punch that hits a surviving grounded enemy can link to the mid kick <strong>70 ms into punch recovery</strong>. The punch pushes 1 px before enemy resistance to keep the target close. The link expires when punch recovery ends.</p>
+    <p>A mid kick can link to the high kick after <strong>100 ms of recovery</strong>. When starting with a punch, the mid kick must hit the <strong>same enemy</strong>. The mid kick confirmation lasts <strong>420 ms from contact</strong>. Each link needs a fresh R press inside its 160 ms input buffer.</p>
+    <p>A miss, a timeout, damage to Jaan, or a new punch resets the chain. Normal recovery applies when there is no confirmed follow-up.</p>
     <div class="table-scroll" role="region" aria-label="Kick effects" tabindex="0"><table>
       <thead><tr><th>Kick</th><th>Push</th><th>Upward launch</th><th>Victim stun</th></tr></thead>
       <tbody>
-        <tr><td>Front</td><td>12 px</td><td>None</td><td>250 ms</td></tr>
-        <tr><td>High</td><td>5 px</td><td>90 px/s</td><td>700 ms, and until landed</td></tr>
-        <tr><td>Very high</td><td>3 px</td><td>120 px/s</td><td>1200 ms, and until landed</td></tr>
+        <tr><td>Mid</td><td>5 px</td><td>90 px/s</td><td>700 ms, and until landed</td></tr>
+        <tr><td>High</td><td>32 px</td><td>120 px/s</td><td>1200 ms, and until landed</td></tr>
       </tbody>
     </table></div>
-    <p>Mosquitoes have 6 health by default: the full 1 + 2 + 3 chain kills one. A surviving critical victim shows a white stun marker. A swing may hit multiple enemies, but the chain tracks the first surviving victim hit.</p>
+    <p>The two kicks deal 5 damage. Opening with a punch raises the total to 6, enough to defeat a regular mosquito. A surviving critical victim shows a white stun marker. A swing may hit multiple enemies, but the chain tracks one target.</p>
   </section>
   <section class="guide-section" id="hit-reactions">
     <h3>03 / WHO GETS HURT?</h3>
     <!-- DIAGRAM:hit-reactions -->
     <p><code>CombatLogicService._canHit</code> decides contact, not sprite overlap or an animation event. The target must be alive, not invulnerable, not already hit by this swing, in front and within reach, within 10 px of the attacker's ground lane, and inside the attack's height tolerance. Failed checks cause no damage; contact can still succeed later in the Active phase.</p>
-    <p>Reach / height tolerance: Punch <strong>32 / 32 px</strong>, Low <strong>34 / 32</strong>, Frontal <strong>38 / 48</strong>, High <strong>42 / 64</strong>, Sting <strong>27 / 10</strong>. Reach uses fighter center distances. Kick ranges are 4 px shorter than the original values; original 12 / 5 / 3 px knockback is preserved for small mosquitoes. Grunts take only 25% of incoming push (3 / 1.25 / 0.75 px), so follow-up kicks remain in range. The full combo connects from normal 23-25 px enemy engagement spacing. Each attack may damage each target once. Player attacks resolve first on simultaneous contact.</p>
-    <p>Level 2 randomly promotes one small mosquito to veteran rank and level 3 promotes three, shown by a yellow asterisk beside its health bar. Its sting uses 0.24 / 0.10 / 0.36 seconds of startup / active / recovery; ordinary stings use 0.30 / 0.10 / 0.45. Damage, reach and movement speed are unchanged.</p>
+    <p>Reach and height tolerance in pixels are <strong>32 / 32</strong> for punch, <strong>38 / 48</strong> for mid kick, <strong>42 / 64</strong> for high kick, and <strong>27 / 10</strong> for sting. Reach uses fighter center distances. Grunts take 25% of incoming push, so follow-up kicks remain in range. Both kicks connect from normal 23–25 px enemy engagement spacing. Each attack may damage each target once. Player attacks resolve first on simultaneous contact.</p>
+    <p>Level 2 randomly promotes one small mosquito to veteran rank and level 3 promotes three. A yellow asterisk marks each veteran. Veterans move faster and can step out of a grounded swing's lane, then move in during Jaan's recovery.</p>
     <p><code>_hit</code> applies damage, push, optional launch, stun, and invulnerability (Jaan: 700 ms; mosquitoes: 280 ms). It clears the victim's buffer and combo, then enters Hurt or Dead. The victim's next rendered pose follows that new state. Grunts use brief KO-sheet recoil for ordinary hits, the full seven-frame KO followed by a reversed get-up for surviving critical finishers, and a separate 12-frame death over 960 ms for lethal hits.</p>
     <p><strong>Mosquito Hurt:</strong> five recoil frames play once over 250 ms using <code>stateTime</code>. The final pose holds through longer stun or launch. A new accepted hit resets the clock and restarts recoil. Only when the stun has elapsed <em>and</em> the victim has landed can it return to Idle.</p>
     <p><strong>Mosquito Dead:</strong> seven burst frames play once over 560 ms, then the mosquito is hidden. Dead remains terminal. <code>won</code> records zero-health enemies; <code>endingAnimationsFinished</code> checks that deaths, attacks, recoil and airborne motion have settled. Both victory and Jaan's defeat now wait for animations and a result popup before Score (see level ending below).</p>

@@ -71,7 +71,7 @@ void main() {
     for (var i = 0; i < 40 && target.health == health; i++) {
       combat.update(1 / 120, input);
     }
-    expect(target.health, 3);
+    expect(target.health, 1);
     expect(target.stateTime, 0);
     expect(animations.frame(target, 99), same(cache.mosquitoHit.first));
     advance(.3);

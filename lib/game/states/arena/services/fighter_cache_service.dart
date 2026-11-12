@@ -9,10 +9,10 @@ class FighterCacheService extends SpriteAnimatorCache {
   late List<Sprite> idle,
       walk,
       punch,
-      frontKick,
+      midKick,
       highKick,
-      veryHighKick,
       jump,
+      playerKo,
       playerDead,
       playerDeadWound,
       mosquito,
@@ -29,72 +29,60 @@ class FighterCacheService extends SpriteAnimatorCache {
       gruntIdleAnimation;
 
   final List<ui.Image> _prepared = [];
-  final Map<String, Future<List<Sprite>>> _gruntSheets = {};
+  final Map<String, Future<List<Sprite>>> _exportedSheets = {};
 
-  Future<List<Sprite>> _loadGruntSheet(FlameGame game, String path,
-      {bool useSheetDimensions = false}) async {
-    final pending = _gruntSheets.putIfAbsent(path, () async {
+  Future<List<Sprite>> _loadExportedSheet(FlameGame game, String path,
+      {({int width, int height})? exportSize}) async {
+    final pending = _exportedSheets.putIfAbsent(path, () async {
       final spec = SpriteSheetSpec.fromPath(path);
       game.images.prefix = '';
       final original = await game.images.load(path);
-      if (!useSheetDimensions) spec.validate(original);
-      final source = await _removeGruntBackground(original);
-      final width = useSheetDimensions ? spec.width : 32;
-      final height = useSheetDimensions ? spec.height : 40;
-      final preparedSpec = SpriteSheetSpec(width, height, spec.frames);
-      if (source.width == width * spec.frames && source.height == height) {
-        return preparedSpec.slice(source);
+      if (exportSize == null ||
+          (original.width == spec.width * spec.frames &&
+              original.height == spec.height)) {
+        spec.validate(original);
+        return spec.slice(await _clearAlphaOneBackground(original));
       }
-      // The filename defines the frame and draw size. Fit whole-sheet exports
-      // to that layout once at load time; components draw the frames at 1:1.
-      final sourceWidth = source.width / spec.frames;
-      final recorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(recorder);
-      final paint = ui.Paint()
-        ..filterQuality = ui.FilterQuality.none
-        ..isAntiAlias = false;
-      for (var i = 0; i < spec.frames; i++) {
-        canvas.drawImageRect(
-            source,
-            ui.Rect.fromLTWH(
-                i * sourceWidth, 0, sourceWidth, source.height.toDouble()),
-            ui.Rect.fromLTWH(
-                (i * width).toDouble(), 0, width.toDouble(), height.toDouble()),
-            paint);
+      if (original.width != exportSize.width ||
+          original.height != exportSize.height) {
+        throw FormatException('Unexpected sprite sheet export size: $path');
       }
-      final picture = recorder.endRecording();
-      final image = picture.toImageSync(spec.frames * width, height);
-      picture.dispose();
-      _prepared.add(image);
-      return preparedSpec.slice(image);
+      // These exports differ from the filename. Use the full height and
+      // round each frame boundary so every source pixel belongs to one frame.
+      final source = await _clearAlphaOneBackground(original);
+      return List.unmodifiable(List.generate(spec.frames, (index) {
+        final start = (index * original.width / spec.frames).roundToDouble();
+        final end =
+            ((index + 1) * original.width / spec.frames).roundToDouble();
+        return Sprite(source,
+            srcPosition: Vector2(start, 0),
+            srcSize: Vector2(end - start, original.height.toDouble()));
+      }));
     });
     try {
       return await pending;
     } catch (_) {
-      if (identical(_gruntSheets[path], pending)) _gruntSheets.remove(path);
+      if (identical(_exportedSheets[path], pending)) {
+        _exportedSheets.remove(path);
+      }
       rethrow;
     }
   }
 
-  @override
-  Future<ui.Image> prepareImage(ui.Image image) async {
-    // Grunt exports use opaque green as their background key.
-    final gruntExport = (image.height == 119 && image.width % 95 == 0) ||
-        (image.height == 58 && image.width % 47 == 0);
-    if (!gruntExport) return image;
-    return _removeGruntBackground(image);
-  }
-
-  Future<ui.Image> _removeGruntBackground(ui.Image image) async {
+  Future<ui.Image> _clearAlphaOneBackground(ui.Image image) async {
     final data = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
     final pixels =
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    // Some exports encode their magenta background at alpha 1.
+    // Opaque magenta belongs to the artwork and is retained.
+    var changed = false;
     for (var i = 0; i < pixels.length; i += 4) {
-      if (pixels[i] == 0 && pixels[i + 1] == 255 && pixels[i + 2] == 0) {
-        // Raw image descriptors use premultiplied alpha; clear RGB as well.
+      if (pixels[i + 3] == 1) {
         pixels.fillRange(i, i + 4, 0);
+        changed = true;
       }
     }
+    if (!changed) return image;
     final buffer = await ui.ImmutableBuffer.fromUint8List(pixels);
     final descriptor = ui.ImageDescriptor.raw(buffer,
         width: image.width,
@@ -115,24 +103,26 @@ class FighterCacheService extends SpriteAnimatorCache {
       image.dispose();
     }
     _prepared.clear();
-    _gruntSheets.clear();
+    _exportedSheets.clear();
     super.dispose();
   }
 
   @override
   Future<void> preload(FlameGame game) async {
-    idle = await loadSheet(game, Assets.resources.images.jannIdle80x994.path);
-    walk = await loadSheet(game, Assets.resources.images.jannWalk92x998.path);
+    walk = await _loadExportedSheet(
+        game, Assets.resources.images.newJanAnimationwalking46x587.path);
     punch =
-        await loadSheet(game, Assets.resources.images.jaanPunch108x984.path);
-    // Existing combat stage IDs now present low -> frontal -> high kicks.
-    frontKick =
-        await loadSheet(game, Assets.resources.images.jannLowKick24x246.path);
-    highKick = await loadSheet(
-        game, Assets.resources.images.jannFrontalKick24x247.path);
-    veryHighKick =
-        await loadSheet(game, Assets.resources.images.jannHighKick24x247.path);
-    jump = await loadSheet(game, Assets.resources.images.jaanJump61x995.path);
+        await loadSheet(game, Assets.resources.images.newJanMpunch46x585.path);
+    idle = List.unmodifiable([punch.first]);
+    midKick =
+        await loadSheet(game, Assets.resources.images.newJanMkick46x583.path);
+    highKick =
+        await loadSheet(game, Assets.resources.images.newJanHkick46x585.path);
+    jump = await _loadExportedSheet(
+        game, Assets.resources.images.newJanAnimationJump46x582.path);
+    playerKo = await _loadExportedSheet(
+        game, Assets.resources.images.newJanAnimationko48x566.path,
+        exportSize: (width: 276, height: 58));
     playerDead =
         await loadSheet(game, Assets.resources.images.jannDeath24x247.path);
     playerDeadWound = await loadSheet(
@@ -143,23 +133,18 @@ class FighterCacheService extends SpriteAnimatorCache {
         await loadSheet(game, Assets.resources.images.mosquitoHit32x325.path);
     mosquitoDead =
         await loadSheet(game, Assets.resources.images.mosquitoDead32x32t7.path);
-    gruntIdle = await _loadGruntSheet(game,
-        Assets.resources.images.mosquitoGruntAnimationIdleSmall47x587.path,
-        useSheetDimensions: true);
-    gruntLight = await _loadGruntSheet(
-        game,
-        Assets
-            .resources.images.mosquitoGruntAnimationLightAttackSmall47x584.path,
-        useSheetDimensions: true);
-    gruntHeavy = await _loadGruntSheet(
-        game,
-        Assets
-            .resources.images.mosquitoGruntAnimationHeavyAttackSmall47x584.path,
-        useSheetDimensions: true);
-    gruntKo = await _loadGruntSheet(
-        game, Assets.resources.images.mosquitoGruntKo95x1197Png.path);
-    gruntDead = await _loadGruntSheet(
-        game, Assets.resources.images.mosquitoGruntDeath195x11912.path);
+    gruntIdle = await _loadExportedSheet(
+        game, Assets.resources.images.gruntIdle47x587.path);
+    gruntLight = await _loadExportedSheet(
+        game, Assets.resources.images.gruntAttackLight47x584.path,
+        exportSize: (width: 190, height: 58));
+    gruntHeavy = await _loadExportedSheet(
+        game, Assets.resources.images.gruntAttackHeavy47x584.path,
+        exportSize: (width: 188, height: 59));
+    gruntKo = await _loadExportedSheet(
+        game, Assets.resources.images.gruntMosquitoDead47x587.path);
+    gruntDead = await _loadExportedSheet(
+        game, Assets.resources.images.gruntFatal47x5815.path);
     gruntIdleAnimation = SpriteAnimationSpec(gruntIdle, stepTime: .13);
     idleAnimation = SpriteAnimationSpec(idle, stepTime: .20);
     walkAnimation = SpriteAnimationSpec(walk, stepTime: .09);

@@ -77,7 +77,7 @@ class CombatLogicService {
     }
     if (player.alive && !settling && !player.knockedDown) {
       if (kick) {
-        player.queueAttack(AttackSpec.frontKick);
+        player.queueAttack(AttackSpec.midKick);
       } else if (punch) {
         player.queueAttack(AttackSpec.punch);
       }
@@ -89,6 +89,7 @@ class CombatLogicService {
     }
     for (final fighter in fighters) {
       fighter.advanceTimers(dt);
+      fighter.advanceKnockback(dt, config);
       _advanceJump(fighter, dt);
       _advanceState(fighter, dt);
     }
@@ -99,7 +100,7 @@ class CombatLogicService {
     // has no authority over this transition.
     if (player.alive &&
         player.state == FighterState.recovery &&
-        player.bufferedAttack == AttackSpec.frontKick &&
+        player.bufferedAttack == AttackSpec.midKick &&
         _comboAvailable() &&
         player.stateTime >= player.attack.comboRecovery) {
       _beginPlayerAttack();
@@ -119,6 +120,11 @@ class CombatLogicService {
       final dx = player.x - enemy.x;
       final dy = player.y - enemy.y;
       enemy.facing = dx < 0 ? -1 : 1;
+      final sidestep = enemy.sidestepDirection(player, config);
+      if (sidestep != null) {
+        _move(enemy, 0, sidestep, enemy.moveSpeed, dt);
+        continue;
+      }
       final nextAttack = enemy.nextAttack;
       if (dx.abs() <= nextAttack.reach - 2 && dy.abs() <= 8) {
         enemy.beginAttack(nextAttack);
@@ -143,11 +149,11 @@ class CombatLogicService {
 
   void _beginPlayerAttack() {
     var next = player.bufferedAttack!;
-    if (next == AttackSpec.frontKick && _comboAvailable()) {
+    if (next == AttackSpec.midKick && _comboAvailable()) {
       next = player.nextComboAttack!;
       // Consume the confirmation. This attack must connect again to advance.
       player.nextComboAttack = null;
-      if (next == AttackSpec.veryHighKick) player.clearCombo();
+      if (next == AttackSpec.highKick) player.clearCombo();
     } else {
       player.clearCombo();
     }
@@ -192,6 +198,11 @@ class CombatLogicService {
                 !f.hitTargets.contains(player.comboTargetId)))) {
       player.clearCombo();
     }
+    if (identical(f, player) &&
+        f.state == FighterState.recovery &&
+        player.nextComboAttack == AttackSpec.midKick) {
+      player.clearCombo();
+    }
     final remainder = f.stateTime - duration;
     f.enter(switch (f.state) {
       FighterState.startup => FighterState.active,
@@ -226,6 +237,10 @@ class CombatLogicService {
   }
 
   void _hit(FighterModel a, FighterModel b) {
+    final groundedPunch = identical(a, player) &&
+        a.attack == AttackSpec.punch &&
+        !a.airborne &&
+        !b.airborne;
     a.hitTargets.add(b.id);
     events.add(CombatEvent(CombatEventType.hitLanded,
         fighterId: a.id, targetId: b.id, attack: a.attack.kind));
@@ -237,23 +252,25 @@ class CombatLogicService {
       b.launch(a.attack.launchSpeed);
     }
     b.invulnerability = b.hitInvulnerability;
-    b.x = (b.x + a.facing * a.attack.knockback * b.knockbackMultiplier)
-        .clamp(config.minX, config.maxX);
+    final knockback =
+        groundedPunch ? AttackSpec.groundedPunchKnockback : a.attack.knockback;
+    b.applyKnockback(a.facing * knockback * b.knockbackMultiplier,
+        a.attack.knockbackDuration, config);
     b.reactToHit(a.attack);
-    if (identical(a, player)) {
-      hits++;
-      if (b.alive &&
-          a.attack == AttackSpec.frontKick &&
-          player.comboTargetId == null) {
-        player.comboTargetId = b.id;
-        player.nextComboAttack = AttackSpec.highKick;
-        player.comboWindow = .42;
-      } else if (b.alive &&
-          a.attack == AttackSpec.highKick &&
-          player.comboTargetId == b.id) {
-        player.nextComboAttack = AttackSpec.veryHighKick;
-        player.comboWindow = .42;
-      }
+    if (!identical(a, player)) return;
+    hits++;
+    if (!b.alive ||
+        (player.comboTargetId != null && player.comboTargetId != b.id)) {
+      return;
     }
+    final followUp = switch (a.attack.kind) {
+      AttackKind.punch when groundedPunch => AttackSpec.midKick,
+      AttackKind.midKick => AttackSpec.highKick,
+      _ => null,
+    };
+    if (followUp == null) return;
+    player.comboTargetId = b.id;
+    player.nextComboAttack = followUp;
+    player.comboWindow = .42;
   }
 }

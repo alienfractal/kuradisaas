@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'arena_config.dart';
 
 part 'player_model.dart';
 part 'enemy_model.dart';
@@ -21,30 +22,20 @@ enum FighterState {
 
 enum PlayerDeathVariant { fall, wound }
 
-enum AttackKind {
-  punch,
-  frontKick,
-  highKick,
-  veryHighKick,
-  sting,
-  gruntLight,
-  gruntHeavy
-}
+enum AttackKind { punch, midKick, highKick, sting, gruntLight, gruntHeavy }
 
 class AttackSpec {
   final AttackKind kind;
   final double launchSpeed, stunSeconds, comboRecovery;
   final bool critical, knockdown;
-  bool get isKick =>
-      kind == AttackKind.frontKick ||
-      kind == AttackKind.highKick ||
-      kind == AttackKind.veryHighKick;
+  bool get isKick => kind == AttackKind.midKick || kind == AttackKind.highKick;
   final double startup,
       active,
       recovery,
       reach,
       laneTolerance,
       knockback,
+      knockbackDuration,
       heightTolerance;
   final int damage;
   const AttackSpec(
@@ -61,26 +52,19 @@ class AttackSpec {
       required this.damage,
       this.laneTolerance = 10,
       this.knockback = 9,
+      this.knockbackDuration = 0,
       this.heightTolerance = 32});
   static const punch = AttackSpec(
       kind: AttackKind.punch,
-      startup: .09,
+      startup: .07,
       active: .075,
       recovery: .19,
+      comboRecovery: .07,
       reach: 32,
       damage: 1);
-  static const frontKick = AttackSpec(
-      kind: AttackKind.frontKick,
-      startup: .14,
-      active: .10,
-      recovery: .48,
-      // Modest 4px reduction from the original range, preserving combo spacing.
-      reach: 34,
-      damage: 1,
-      knockback: 12,
-      comboRecovery: .08);
-  static const highKick = AttackSpec(
-      kind: AttackKind.highKick,
+  static const groundedPunchKnockback = 1.0;
+  static const midKick = AttackSpec(
+      kind: AttackKind.midKick,
       startup: .12,
       active: .10,
       recovery: .50,
@@ -91,14 +75,15 @@ class AttackSpec {
       stunSeconds: .70,
       comboRecovery: .10,
       heightTolerance: 48);
-  static const veryHighKick = AttackSpec(
-      kind: AttackKind.veryHighKick,
+  static const highKick = AttackSpec(
+      kind: AttackKind.highKick,
       startup: .16,
       active: .10,
       recovery: .65,
       reach: 42,
       damage: 3,
-      knockback: 3,
+      knockback: 32,
+      knockbackDuration: .22,
       launchSpeed: 120,
       stunSeconds: 1.2,
       critical: true,
@@ -124,17 +109,17 @@ class AttackSpec {
       knockdown: true);
   static const sting = AttackSpec(
       kind: AttackKind.sting,
-      startup: .30,
+      startup: .24,
       active: .10,
-      recovery: .45,
+      recovery: .36,
       reach: 27,
       damage: 1,
       heightTolerance: 10);
   static const veteranSting = AttackSpec(
       kind: AttackKind.sting,
-      startup: .24,
+      startup: .18,
       active: .10,
-      recovery: .36,
+      recovery: .28,
       reach: 27,
       damage: 1,
       heightTolerance: 10);
@@ -174,6 +159,8 @@ sealed class FighterModel {
   double elevation = 0;
   double verticalVelocity = 0;
   double jumpTime = 0;
+  double _knockbackVelocity = 0;
+  double _knockbackTime = 0;
   bool get airborne => elevation > 0 || verticalVelocity > 0;
   int attackSerial = 0;
   final Set<int> hitTargets = {};
@@ -229,6 +216,28 @@ sealed class FighterModel {
     final headroom = math.max(0.0, maxLaunchHeight - elevation);
     verticalVelocity = math.min(speed, math.sqrt(2 * gravity * headroom));
     jumpTime = 0;
+  }
+
+  void applyKnockback(double distance, double duration, ArenaConfig arena) {
+    _knockbackTime = duration;
+    if (duration == 0) {
+      x = (x + distance).clamp(arena.minX, arena.maxX);
+      _knockbackVelocity = 0;
+      return;
+    }
+    _knockbackVelocity = 2 * distance / duration;
+  }
+
+  void advanceKnockback(double dt, ArenaConfig arena) {
+    if (_knockbackTime == 0) return;
+    final elapsed = math.min(dt, _knockbackTime);
+    final remaining = _knockbackTime - elapsed;
+    // Average the start and end velocities for constant deceleration.
+    final nextVelocity = _knockbackVelocity * (remaining / _knockbackTime);
+    final nextX = x + (_knockbackVelocity + nextVelocity) * .5 * elapsed;
+    x = nextX.clamp(arena.minX, arena.maxX);
+    _knockbackVelocity = nextVelocity;
+    _knockbackTime = x == nextX ? remaining : 0;
   }
 
   void beginAttack([AttackSpec? spec]) {

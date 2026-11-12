@@ -1,13 +1,10 @@
 # Kuradi Sääsed
 
 A real-time CGA karate brawler in Flutter + Flame, using the original Jaan and
-man-sized mosquito sprites. This playable slice is a scrolling night street
-campaign with three encounters. Level 2 marks one randomly chosen small mosquito
-with a yellow asterisk: this veteran attacks with a shorter windup and recovery.
-Level 3 mixes three veteran and two regular small mosquitoes with two tougher
-grunt mosquitoes. Grunts now have dedicated KO/get-up and death animations;
-lethal hits play all 12 death frames before disappearing. The archived GameMaker project remains
-untouched alongside this folder.
+man-sized mosquito sprites. The night street campaign has three encounters.
+Levels 2 and 3 mark one and three small mosquitoes with yellow asterisks.
+These veterans move faster, sidestep grounded swings, and can sting during
+Jaan's recovery. Grunts have dedicated knockdown, get-up, and death animations.
 
 ## Run
 
@@ -80,17 +77,17 @@ downloads. Regenerate it from the canonical Markdown using
 | WASD / arrow keys | Walk horizontally and across depth lanes |
 | Space | Jump (one press per jump) |
 | E | Punch |
-| R | Kick; repeat quickly on connected hits for a three-stage combo |
+| R | Mid kick. Tap again after contact for a high kick |
 | Enter | Start / resume / continue through Score and End |
 | P / Escape | Pause / resume |
 | F1 | Show ground bounds, body guides, attack range, and combat state |
 | Onscreen arrows / JUMP / PUNCH / KICK | Touch or mouse controls |
 
 Line up your feet with an enemy and punch toward it. The magenta warning above a
-mosquito signals its sting windup. Step away or interrupt it. Clear all five
-mosquitoes to clear the level. Jaan has eight health points; mosquitoes have six
-each. The first test level has five mosquitoes and the second has seven. Jaan's
-health resets for each level, and the score carries through the run.
+mosquito signals its sting windup. Step away or interrupt it. Defeat every enemy
+to clear the level. Levels 1, 2, and 3 have 5, 7, and 5 small mosquitoes and 1, 2,
+and 4 grunts, respectively. Jaan has eight health points and small mosquitoes
+have six. Jaan starts each level at full health and carries his score forward.
 
 The global flow mirrors RevaliaObscura:
 
@@ -189,9 +186,8 @@ flutter build web
 
 ### Pixel grid
 
-Jaan's imported frames use mostly 4x4 source blocks and mosquitoes use 3x3.
-Presentation normalizes those to the street's 1-pixel grid: Jaan's idle frame
-is about 20x25 game pixels, and a mosquito is 32x32. Source PNGs are unchanged.
+Jaan and the grunts draw at native frame sizes. Jaan's new 46x58 cells align
+their foot line to the ground. Small mosquitoes draw at 32x32 game pixels.
 Sprite bounds, camera positions, shadows, and health bars use whole game pixels.
 The viewport chooses a whole-number physical display scale using device pixel
 ratio, and letterboxes spare screen space rather than stretching the artwork.
@@ -216,37 +212,37 @@ on the street. No double jump or jump-cancelling an attack; moving and attacking
 while airborne are supported. Stings can miss while Jaan is high in the air,
 but takeoff and landing remain vulnerable.
 
-Punch: 1 damage, 9px knockback, 0.09/0.075/0.19s startup/active/recovery.
-R chains low -> frontal -> high, using native 24x24 sheets with 6/7/7 frames.
+Punch deals 1 damage with 70/75/190 ms of startup, active time, and recovery.
+When both fighters are grounded, it pushes just 1px before enemy resistance.
+Tap R after contact to start the mid kick 70 ms into punch recovery. The punch
+must hit a surviving enemy, and the mid kick must hit that enemy to link to high.
+R starts with the mid kick and can follow with the high kick.
 Each follow-up requires a hit on the same surviving enemy and another R press
 within 0.42s of contact. Inputs buffer for 0.16s, so press near contact or recovery;
-holding R does not repeat. Missing, waiting too long, punching or taking damage
-resets the chain. A kick can hit several enemies, but the chain tracks the first
-survivor hit.
+holding R does not repeat. Missing, waiting too long, or taking damage resets
+the chain. A new punch starts a new exchange. An attack can hit several enemies,
+and the chain tracks the first survivor hit.
 
 | Kick | Damage | Knockback | Launch speed | Startup / active / recovery |
 | --- | --- | --- | --- | --- |
-| Low | 1 | 12px | none | .14 / .10 / .48s |
-| Frontal | 2 | 5px | 90px/s | .12 / .10 / .50s |
-| High | 3 (critical) | 3px | 120px/s | .16 / .10 / .65s |
+| Mid | 2 | 5px | 90px/s | .12 / .10 / .50s |
+| High | 3 (critical) | 32px | 120px/s | .16 / .10 / .65s |
 
-Kick reach uses center distances of 34/38/42 game pixels: a modest 4px
-reduction from the original 38/42/46 ranges. Original 12/5/3px knockback is
-preserved for regular mosquitoes; all three hits connect at normal 23-25px enemy
-engagement spacing. Grunts take only 25% of incoming horizontal knockback
-(3 / 1.25 / .75px from the three kicks), helping follow-ups connect even at the
-first kick's outer reach. Grunt resistance affects horizontal push only. Kick launches stay within 24 game pixels of the ground, including repeated airborne hits.
+Mid and high kick reach use center distances of 38 and 42 game pixels. Both
+kicks connect at normal 23–25px enemy engagement spacing. Grunts take 25% of
+incoming horizontal knockback, or 1.25px from the mid kick and 8px from the
+high kick. High-kick knockback slows to a stop over 220 ms. Kick launches stay
+within 24 game pixels of the ground.
 
-A confirmed, buffered follow-up can begin after .08s of front recovery or .10s
-of high recovery. Otherwise the entire recovery applies. High kicks stun for
-.70s; very-high kicks stun surviving enemies for 1.2s (white star indicator).
-Launched enemies cannot recover until they land. Mosquitoes now have 6 health,
-so a full 1+2+3 combo is lethal. The simulation selects the impact pose while
-active; no animation-completion callbacks unlock attacks.
-Regular mosquito sting: 0.30/0.10/0.45s. A level-2 veteran's sting uses
-0.24/0.10/0.36s: 20% shorter windup/recovery, with the same 1 damage and reach.
-One small mosquito is promoted at random on level 2; three are promoted on level 3;
-the asterisk remains visible beside its health bar while it is alive.
+A confirmed, buffered high kick can begin after .10s of mid kick recovery.
+Mid kicks stun for .70s, and high kicks stun survivors for 1.2s with a white
+star indicator. Launched enemies stay hurt until they land and their stun
+expires. The two kicks deal 5 damage. Opening with a grounded punch raises
+the total to 6, enough to defeat a regular mosquito.
+Regular stings use 240/100/360 ms of startup, active time, and recovery.
+Veteran stings use 180/100/280 ms. Both deal 1 damage with 27px reach.
+Free veterans can move out of a grounded attack's lane while Jaan swings,
+then close in during recovery. The yellow asterisk marks each living veteran.
 All attack timings and hit decisions remain in the pure combat simulation.
 
 
@@ -279,30 +275,40 @@ The updated Combat Guide explains the ending phases.
 
 ## Audio
 
-Kuradi reuses the hardened `GameAudioPlayer` from the newer CoolorBurn copy,
-with Flame Audio 2.10.3 / Audioplayers 6.1.0 and the same pool-failure fallback.
-All sounds are registered under `resources/sound/`.
+Web builds offer **MP3 / MIDI gameplay SFX**, including footsteps. Use the
+**SFX MODE** button above the volume icons on Main Menu or Pause to switch.
+Its label shows the current mode; MIDI is the web default. MP3 selects the
+original recordings (including existing WAV/OGG footsteps and jump).
+`GameAudioBackend` accepts typed `SoundCue` / `MusicCue` requests; game rules and
+views never choose filenames, instruments or MIDI notes. The platform factory
+selects the available renderers. Logo and Lore retain their OGG music in both modes.
 
-| Trigger | Sound |
+| Trigger | Web sound |
 | --- | --- |
 | App opening | `alien_retro_logo_mfx.ogg`, once; may finish on Main Menu |
 | Lore view | `alien_retro_intro.ogg`, looping; stops on Back |
-| Accepted jump | `sfx_jaan_jump_1.wav` |
-| Ground movement | `sfx_kurat_jaan_walk.ogg`, separate loop; stops when motion stops |
-| Accepted punch/kick | `blockHit1.mp3` |
-| Jaan hits an enemy | `blockHit2.mp3` |
-| Jaan takes damage | `blockHit3.mp3` |
+| Accepted jump | Rising square-lead MIDI phrase |
+| Ground movement | Quiet MIDI woodblock footsteps every 360 ms |
+| Accepted punch/kick | Short falling saw-lead phrase |
+| Jaan hits an enemy | MIDI kick/snare impact |
+| Jaan takes damage | Lower descending saw-lead phrase |
+
+In MIDI mode, the local `web/midi_synth.js` renderer uses Web Audio, with no downloaded bank,
+MIDI device or external service. It implements only the instrument/drum slots
+used by the game, rather than a full General MIDI sound bank or MIDI-file player.
+Native composition retains the original recorded effects; native runners are
+not included or verified.
 
 The simulation emits accepted action/hit events; `GameAudioService` routes them
-once per fixed step. Animation callbacks do not trigger sounds or combat. The
-walk loop stops on jump, attack, hurt, pause or ending, and does not play when
-pushing against a boundary. Music and walking use independent players.
-
-On web, startup audio waits for the first key press or tap. Only the
-current blocked music/walk request retries; leaving Lore, pausing or disposing
-cancels pending starts. Old impacts are not queued to replay on a later gesture.
-Pause stops current sound; Lore music restarts after returning from app suspension.
-No gameplay music has been assigned. For details see [docs/audio.md](docs/audio.md).
+once per fixed step. Footsteps follow actual grounded movement and stop on
+idle, jump, attack, hurt, pause, screen exit or ending. Music and SFX have
+independent volume controls. Before the first key/tap, short effects are dropped.
+Mode changes, pause, mute and disposal release sounding and scheduled notes.
+Switching preserves volume and pause state; the mode survives levels and new
+runs until the app restarts. Resuming does
+not replay old impacts; current walking can produce new footfalls.
+No gameplay music has been assigned. See [docs/audio.md](docs/audio.md) for
+ownership, cue editing, supported MIDI slots and verification commands.
 
 ## Shared sound and CRT controls
 

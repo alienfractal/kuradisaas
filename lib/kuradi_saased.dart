@@ -7,8 +7,8 @@ import 'game/states/score/services/score_cache_service.dart';
 import 'game/states/end/services/end_cache_service.dart';
 import 'dart:math' as math;
 import 'dart:async';
-import 'audio/audio_player_wrapper.dart';
-import 'audio/game_audio_player.dart';
+import 'audio/game_audio_backend.dart';
+import 'audio/platform_game_audio.dart';
 import 'audio/game_audio_service.dart';
 import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
@@ -83,8 +83,8 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
   bool showDebug = false;
   double _accumulator = 0;
   static const step = 1 / 120;
-  KuradiSaased({CampaignModel? campaign, AudioPlayerWrapper? audioPlayer})
-      : audio = GameAudioService(audioPlayer ?? GameAudioPlayer()),
+  KuradiSaased({CampaignModel? campaign, GameAudioBackend? audioPlayer})
+      : audio = GameAudioService(audioPlayer ?? createGameAudio()),
         campaign = campaign ?? CampaignModel();
   @override
   Color backgroundColor() => const Color(0xFF000000);
@@ -178,12 +178,19 @@ class KuradiSaased extends FlameGame with KeyboardEvents, TapCallbacks {
 
   void cycleEffectsVolume() {
     settings.cycleEffects();
-    unawaited(audio.player.setSoundFxVolume(settings.effectsVolume));
+    unawaited(audio.setEffectsVolume(settings.effectsVolume));
   }
 
   void cycleMusicVolume() {
     settings.cycleMusic();
-    unawaited(audio.player.setMusicVolume(settings.musicVolume));
+    unawaited(audio.setMusicVolume(settings.musicVolume));
+  }
+
+  Future<void> toggleEffectsMode() {
+    final next = audio.effectsMode == EffectsMode.midi
+        ? EffectsMode.mp3
+        : EffectsMode.midi;
+    return audio.setEffectsMode(next);
   }
 
   void toggleCrt() {

@@ -8,7 +8,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
-import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
+import 'package:kuradi_saased/audio/game_audio_backend.dart';
 import 'package:kuradi_saased/gamefsm/game_menu_fsm.dart';
 import 'package:kuradi_saased/gamefsm/game_fsm.dart';
 import 'package:kuradi_saased/game/states/main_menu/views/lore_view.dart';
@@ -18,13 +18,12 @@ import 'package:kuradi_saased/game/states/arena/handlers/fighter_animation_handl
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('street viewport and original sprite sheets render headlessly',
-      () async {
+  test('street viewport and current sprite sheets render headlessly', () async {
     await (FontLoader(FontFamily.arcade)
           ..addFont(
               rootBundle.load(Assets.resources.fonts.pressStart2PRegular)))
         .load();
-    final game = KuradiSaased(audioPlayer: SilentAudioPlayer());
+    final game = KuradiSaased(audioPlayer: SilentAudioBackend());
     game.onGameResize(Vector2(1024, 512));
     // ignore: invalid_use_of_internal_member
     await game.load();
@@ -84,10 +83,10 @@ void main() {
     final mosquitoPresentation = MosquitoAnimationHandler(game.spriteCache);
     final presentation = PlayerAnimationHandler(game.spriteCache);
     for (final (frames, width, height, count) in [
-      (game.spriteCache.idle, 80, 99, 4),
-      (game.spriteCache.walk, 92, 99, 8),
-      (game.spriteCache.punch, 108, 98, 4),
-      (game.spriteCache.jump, 61, 99, 5),
+      (game.spriteCache.idle, 46, 58, 1),
+      (game.spriteCache.walk, 46, 58, 7),
+      (game.spriteCache.punch, 46, 58, 5),
+      (game.spriteCache.jump, 46, 58, 2),
       (game.spriteCache.mosquito, 96, 96, 4),
     ]) {
       expect(frames, hasLength(count));
@@ -100,7 +99,7 @@ void main() {
     expect(
         presentation.displaySize(
             game.combat.player, game.spriteCache.idle.first),
-        Vector2(20, 25));
+        Vector2(46, 58));
     expect(
         mosquitoPresentation.displaySize(
             game.combat.enemies.whereType<MosquitoModel>().first,
@@ -137,43 +136,29 @@ void main() {
     game.input.kick();
     game.update(.1);
     game.update(.1);
-    expect(game.combat.player.attack, AttackSpec.frontKick);
-    expect(game.spriteCache.frontKick,
+    expect(game.combat.player.attack, AttackSpec.midKick);
+    expect(game.spriteCache.midKick,
         contains(presentation.frame(game.combat.player, 0)));
     await snapshot('street-preview-kick');
-    for (final spec in [
-      AttackSpec.frontKick,
-      AttackSpec.highKick,
-      AttackSpec.veryHighKick
+    for (final (spec, frames, windup) in [
+      (AttackSpec.midKick, game.spriteCache.midKick, [0]),
+      (AttackSpec.highKick, game.spriteCache.highKick, [0, 1, 2]),
     ]) {
-      final frames = switch (spec.kind) {
-        AttackKind.frontKick => game.spriteCache.frontKick,
-        AttackKind.highKick => game.spriteCache.highKick,
-        _ => game.spriteCache.veryHighKick,
-      };
-      final low = spec == AttackSpec.frontKick;
-      expect(frames.length, low ? 6 : 7);
+      final contact = [windup.length, windup.length + 1];
+      expect(frames.length, windup.length + contact.length);
       game.combat.player
         ..attack = spec
         ..enter(FighterState.active);
-      expect(
-          presentation.frame(game.combat.player, 0), same(frames[low ? 4 : 5]));
+      expect(presentation.frame(game.combat.player, 0),
+          same(frames[contact.first]));
       expect(presentation.displaySize(game.combat.player, frames.first),
-          Vector2(24, 24));
-      expect(frames.first.srcSize, Vector2(24, 24));
+          Vector2(46, 58));
+      expect(frames.first.srcSize, Vector2(46, 58));
       await snapshot('street-preview-${spec.kind.name}');
       for (final (state, duration, poses) in [
-        (
-          FighterState.startup,
-          spec.startup,
-          low ? [0, 1, 2, 3] : [0, 1, 2, 3, 4]
-        ),
-        (FighterState.active, spec.active, low ? [4, 5] : [5, 6]),
-        (
-          FighterState.recovery,
-          spec.recovery,
-          low ? [3, 2, 1, 0] : [4, 3, 2, 1, 0]
-        ),
+        (FighterState.startup, spec.startup, windup),
+        (FighterState.active, spec.active, contact),
+        (FighterState.recovery, spec.recovery, windup.reversed.toList()),
       ]) {
         game.combat.player.enter(state);
         for (var i = 0; i < poses.length; i++) {

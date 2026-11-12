@@ -25,7 +25,7 @@ void main() {
       e.y = 120;
     }
   });
-  test('punch has startup and deals only one hit during active frames', () {
+  test('punch lands quickly and deals only one hit during active frames', () {
     final target = combat.enemies.first
       ..x = 103
       ..y = 153;
@@ -33,9 +33,10 @@ void main() {
     advance(combat, input, .05);
     expect(target.health, 3);
     expect(combat.player.state, FighterState.startup);
-    advance(combat, input, .12);
+    advance(combat, input, .03);
     expect(target.health, 2);
     expect(combat.hits, 1);
+    expect(combat.player.state, FighterState.active);
     advance(combat, input, .3);
     expect(target.health, 2);
     expect(combat.player.state, FighterState.idle);
@@ -120,24 +121,22 @@ void main() {
     expect(fsm.transition(GlobalGameState.menu), isTrue);
   });
 
-  test('low kick deals one damage with its original pushback, once per attack',
-      () {
+  test('mid kick deals two damage and launches once per attack', () {
     final target = combat.enemies.first
       ..x = 103
       ..y = 153;
     input.kick();
     advance(combat, input, .12);
     expect(target.health, 3);
-    expect(combat.player.attack, AttackSpec.frontKick);
+    expect(combat.player.attack, AttackSpec.midKick);
     advance(combat, input, .08);
-    expect(target.health, 2);
-    expect(target.x, 115);
+    expect(target.health, 1);
+    expect(target.x, 108);
+    expect(target.airborne, isTrue);
     expect(combat.hits, 1);
     advance(combat, input, .06);
-    expect(target.health, 2);
+    expect(target.health, 1);
     expect(combat.hits, 1);
-    expect(AttackSpec.frontKick.knockback,
-        greaterThan(AttackSpec.punch.knockback));
   });
 
   test('kick recovery cannot be cancelled by punch, kick or jump', () {
@@ -200,7 +199,7 @@ void main() {
     expect(combat.player.health, 7);
   });
 
-  test('player can kick in the air and mosquitoes have the faster timing', () {
+  test('player can kick in the air', () {
     final target = combat.enemies.first
       ..x = 103
       ..y = 153;
@@ -209,9 +208,7 @@ void main() {
       ..kick();
     advance(combat, input, .2);
     expect(combat.player.airborne, isTrue);
-    expect(target.health, 2);
-    expect(AttackSpec.sting.startup, .30);
-    expect(AttackSpec.sting.recovery, .45);
+    expect(target.health, 1);
   });
 
   test('clearing input discards jump, punch and kick intents', () {

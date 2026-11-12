@@ -11,4 +11,7 @@ sealed class EnemyModel extends FighterModel {
 
   AttackSpec get nextAttack;
   double get moveSpeed;
+
+  /// Null resumes pursuit. Zero holds the current lane until the swing ends.
+  double? sidestepDirection(PlayerModel player, ArenaConfig arena) => null;
 }

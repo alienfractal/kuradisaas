@@ -101,7 +101,7 @@ void main() {
       ..enter(FighterState.dead)
       ..elevation = 20
       ..verticalVelocity = 200;
-    player.beginAttack(AttackSpec.veryHighKick);
+    player.beginAttack(AttackSpec.highKick);
     final input = InputService()
       ..kick()
       ..jump();

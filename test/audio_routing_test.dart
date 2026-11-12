@@ -1,35 +1,34 @@
 import 'package:flame/components.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
+import 'package:kuradi_saased/audio/game_audio_backend.dart';
 import 'package:kuradi_saased/audio/game_audio_service.dart';
-import 'package:kuradi_saased/audio/game_sounds.dart';
 import 'package:kuradi_saased/game/states/arena/model/fighter_model.dart';
 import 'package:kuradi_saased/game/states/arena/services/combat_logic_service.dart';
 import 'package:kuradi_saased/game/states/arena/services/input_service.dart';
 import 'package:kuradi_saased/gamefsm/game_menu_fsm.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
 
-class RecordingAudio extends SilentAudioPlayer {
-  final effects = <String>[];
-  final music = <(String, bool)>[];
-  final walking = <String>[];
-  List<String> preloaded = [];
+class RecordingAudio extends SilentAudioBackend {
+  final effects = <SoundCue>[];
+  final music = <(MusicCue, bool)>[];
+  int walking = 0;
+  bool preloaded = false;
   int musicStops = 0, walkStops = 0, sfxStops = 0, disposals = 0;
   @override
-  Future<void> initSfxPool(List<String> paths) async {
-    preloaded = paths;
+  Future<void> preload() async {
+    preloaded = true;
   }
 
   @override
-  void playSoundFx(String path) => effects.add(path);
+  void playEffect(SoundCue cue) => effects.add(cue);
   @override
-  Future<void> playMusic(String path, {bool loop = false}) async {
-    music.add((path, loop));
+  Future<void> playMusic(MusicCue cue, {bool loop = false}) async {
+    music.add((cue, loop));
   }
 
   @override
-  Future<void> playWalking(String path) async {
-    walking.add(path);
+  void startWalking() {
+    walking++;
   }
 
   @override
@@ -38,12 +37,12 @@ class RecordingAudio extends SilentAudioPlayer {
   }
 
   @override
-  Future<void> stopWalking() async {
+  void stopWalking() {
     walkStops++;
   }
 
   @override
-  Future<void> stopSfx() async {
+  Future<void> stopEffects() async {
     sfxStops++;
   }
 
@@ -82,21 +81,21 @@ void main() {
       () {
     input.jump();
     advance(.1);
-    expect(backend.effects, [GameSounds.jump]);
+    expect(backend.effects, [SoundCue.jump]);
     input.jump();
     advance(.1);
-    expect(backend.effects, [GameSounds.jump]);
+    expect(backend.effects, [SoundCue.jump]);
     advance(.5);
     input.jump();
     advance(.01);
-    expect(backend.effects, [GameSounds.jump, GameSounds.jump]);
+    expect(backend.effects, [SoundCue.jump, SoundCue.jump]);
   });
 
   test('walking has one loop and stops on idle, boundary, attack or takeoff',
       () {
     input.keyboard.add('right');
     advance(.3);
-    expect(backend.walking, [GameSounds.walk]);
+    expect(backend.walking, 1);
     input.keyboard.clear();
     advance(.01);
     expect(backend.walkStops, 1);
@@ -105,18 +104,18 @@ void main() {
     input.jump();
     advance(.01);
     expect(backend.walkStops, 2);
-    expect(backend.walking, hasLength(2));
+    expect(backend.walking, 2);
     advance(.7);
-    expect(backend.walking, hasLength(3));
+    expect(backend.walking, 3);
     input.punch();
     advance(.01);
     expect(backend.walkStops, 3);
     advance(.5);
     combat.player.x = combat.config.maxX;
     advance(.02);
-    final count = backend.walking.length;
+    final count = backend.walking;
     advance(.3);
-    expect(backend.walking.length, count);
+    expect(backend.walking, count);
   });
 
   test('attack, contact and incoming hurt use separate once-per-event sounds',
@@ -126,21 +125,21 @@ void main() {
       ..y = combat.player.y;
     input.punch();
     advance(.05);
-    expect(backend.effects, [GameSounds.attack]);
+    expect(backend.effects, [SoundCue.attack]);
     advance(.12);
-    expect(backend.effects, [GameSounds.attack, GameSounds.impact]);
+    expect(backend.effects, [SoundCue.attack, SoundCue.impact]);
     advance(.15);
-    expect(backend.effects.where((e) => e == GameSounds.impact), hasLength(1));
+    expect(backend.effects.where((e) => e == SoundCue.impact), hasLength(1));
     target
       ..x = combat.player.x + 10
       ..facing = -1
       ..beginAttack()
       ..enter(FighterState.active);
     advance(.01);
-    expect(backend.effects.last, GameSounds.hurt);
+    expect(backend.effects.last, SoundCue.hurt);
     input.punch();
     advance(.01);
-    expect(backend.effects.where((e) => e == GameSounds.attack), hasLength(1));
+    expect(backend.effects.where((e) => e == SoundCue.attack), hasLength(1));
   });
 
   test(
@@ -150,9 +149,9 @@ void main() {
     advance(.1);
     input.punch();
     advance(.5);
-    expect(backend.effects, [GameSounds.attack]);
+    expect(backend.effects, [SoundCue.attack]);
     advance(.2);
-    expect(backend.effects, [GameSounds.attack]);
+    expect(backend.effects, [SoundCue.attack]);
   });
 
   test('leaving Lore cancels its loop and suspension silences current activity',
@@ -160,9 +159,9 @@ void main() {
     audio.enterMenu(MenuState.intro);
     audio.enterMenu(MenuState.logo);
     audio.enterMenu(MenuState.main);
-    expect(backend.music, [(GameSounds.logo, false)]);
+    expect(backend.music, [(MusicCue.logo, false)]);
     audio.enterMenu(MenuState.lore);
-    expect(backend.music.last, (GameSounds.lore, true));
+    expect(backend.music.last, (MusicCue.lore, true));
     audio.enterMenu(MenuState.main);
     expect(backend.musicStops, 1);
     input.keyboard.add('right');
@@ -184,21 +183,21 @@ void main() {
     // ignore: invalid_use_of_internal_member
     game.mount();
     await game.ready();
-    expect(backend.preloaded, GameSounds.effects);
-    expect(backend.music, [(GameSounds.logo, false)]);
+    expect(backend.preloaded, isTrue);
+    expect(backend.music, [(MusicCue.logo, false)]);
     game.handleIntroInput();
     game.update(GameMenuFsm.logoDuration);
     await game.ready();
     game.showLore();
     await game.ready();
-    expect(backend.music.last, (GameSounds.lore, true));
+    expect(backend.music.last, (MusicCue.lore, true));
     game.closeLore();
     await game.ready();
     await game.startGame();
     await game.ready();
     game.input.jump();
     game.update(.05);
-    expect(backend.effects, contains(GameSounds.jump));
+    expect(backend.effects, contains(SoundCue.jump));
     game.togglePause();
     expect(backend.sfxStops, greaterThan(0));
     game.removeAll(game.children.toList());

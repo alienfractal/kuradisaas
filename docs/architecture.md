@@ -65,8 +65,8 @@ the UML document.
 `isGrunt` flags are removed. Common state includes health, position, attacks,
 jump motion, and hit/death phases. `PlayerModel` owns combo confirmation,
 death-variant selection, knockdown recovery, and air steering permission.
-`EnemyModel` exposes attack choice and movement speed; `GruntModel` advances
-light/heavy alternation only when a windup reaches its strike phase. Incoming
+`EnemyModel` exposes attack choice, movement speed, and optional sidestep direction.
+`GruntModel` advances light/heavy alternation only when a windup reaches its strike phase. Incoming
 horizontal push uses the target's `knockbackMultiplier`: 1 normally, .25 for
 grunts. Attack damage, reach, and launch are unaffected.
 
@@ -74,9 +74,11 @@ grunts. Attack damage, reach, and launch are unaffected.
 flag, model subclass, or factory branch. `LevelDefinition.veteranCount` is one
 on level 2, three on level 3, and zero on level 1. Combat randomly selects unique
 small-mosquito slots (excluding grunts); an optional injected `Random` makes
-selection reproducible in tests. Veteran sting startup/recovery are .24/.36s,
-versus .30/.45s normally. `MosquitoEntity` draws the persistent yellow asterisk
-beside the health bar; simulation does not know about that artwork.
+selection reproducible in tests. Veteran sting startup/recovery are .18/.28s,
+versus .24/.36s normally. Veterans move at 34px/s versus 25px/s for regulars.
+A free veteran in front of a grounded swing sidesteps to a lane outside its
+depth tolerance when arena bounds permit. It resumes pursuit as Jaan enters
+recovery. `MosquitoEntity` draws the yellow asterisk beside the health bar.
 
 `FighterEntity<M extends FighterModel>` is an abstract `PositionComponent` with
 a final typed model and a `FighterAnimationHandler<M>`. `PlayerEntity`,
@@ -181,8 +183,9 @@ Continuing from a cleared level enters Loading for the next level if one exists;
 otherwise it enters End. Defeat also leads from Score to End. End returns to Menu.
 Pause resumes the same level, or abandons it to Menu without recording a result.
 
-Three street encounters exercise this full flow, with veterans on levels 2/3
-and two grunts on level 3.
+The three street encounters have 5, 7, and 5 small mosquitoes and 1, 2, and 4
+grunts, respectively. Levels 2 and 3 promote one and three small mosquitoes to
+veterans.
 Definitions live in `CampaignModel`; each receives a fresh arena and full player
 health. Scores survive world replacement, but reset when starting a new run.
 Scoring is 10 per landed attack, 100 per defeated mosquito, and 25 per remaining health
@@ -209,15 +212,15 @@ finishes. Hurt cancels the current attack and input buffer. Dead is terminal.
 The next attack can be buffered for 160 ms during recovery. Keyboard repeats do
 not queue attacks; tapping E/PUNCH, R/KICK, or Space/JUMP creates one matching intent.
 
-Punch: 90 ms startup, 75 ms active, 190 ms recovery. Mosquito sting: 300 ms
-startup, 100 ms active, 450 ms recovery. Change `AttackSpec` to tune these values.
+Punch uses 70/75/190 ms of startup, active time, and recovery. Regular stings
+use 240/100/360 ms and veteran stings use 180/100/280 ms. `AttackSpec` owns these timings.
 The mosquito's magenta warning appears during startup. Flight art is used for movement and sting. Hurt plays the new five-frame recoil
 once in .25s, then holds its final pose during extended stun/launch. Dead plays
 the seven-frame burst once over .56s, with no blinking or squash. These are read
 from stateTime; finishing a sheet never changes combat. The final enemy's death
 window completes before the ending popup (`endingAnimationsFinished`); `won`
 still means every enemy has zero health. Grunts override the death window to
-.96s for their 12-frame death sheet. Their animation handler samples the first
+.96s for their 15-frame death sheet. Their animation handler samples the first
 three KO frames for ordinary recoil; surviving critical finishers play the full
 seven-frame KO, hold, then reverse it in the last .35s of stun. These poses use
 the existing Hurt state and do not change combat recovery or add immunity. Both win and defeat use the same
@@ -255,7 +258,7 @@ pauses a running session. Presentation is frozen outside play.
 
 ## Boundaries of this first slice
 
-Two street encounters, punch, jump, three-stage kick combo, keyboard/touch controls, health,
+Three street encounters, punch, jump, two-stage kick combo, keyboard/touch controls, health,
 pause/resume, cumulative scoring, and the global Menu/Loading/Level/Score/End flow.
 There is no save data, mobile packaging, or controller support yet.
 Web is the generated runner. Flutter/Flame code can be reused for desktop/mobile
@@ -277,30 +280,36 @@ kick follow-up in its permitted recovery window. Jumping cannot bypass recovery.
 
 ## Hit-confirmed kick combo
 
-Kick contact retains the original center-distance rule, with a modest range
-reduction from 38/42/46px to 34/38/42px. Knockback stays at its original
-12/5/3px. Regression checks require the full combo to connect from normal
-23-25px enemy engagement spacing in both directions without player movement.
+Mid and high kicks have 38px and 42px of center-distance reach. Regression
+checks require both to connect from normal 23–25px enemy engagement spacing
+in either direction without player movement.
 
 
-`AttackKind` distinguishes front, high and very-high kicks without duplicating the
+`AttackKind` distinguishes mid and high kicks within the same
 startup/active/recovery FSM. `AttackSpec` stores timing, damage, knockback,
 launch speed, stun duration and the earliest permitted combo recovery time.
 
 R queues a kick intent. `CombatLogicService._beginPlayerAttack` resolves it to
-front, or to the confirmed next stage. `_hit` confirms a surviving target for
-0.42 seconds; the next stage must hit that same target to advance again. The
-confirmation is consumed when the follow-up starts, so missing cannot reuse it.
+the mid kick or a confirmed high kick. A punch that hits a surviving grounded
+target while Jaan is grounded can link to the mid kick 70 ms into recovery.
+The punch pushes 1px before enemy resistance to keep the target in range.
+The punch link expires at the end of punch recovery. A mid kick must hit the
+confirmed punch target to link to high. A mid kick that starts from neutral
+confirms the first surviving enemy it hits. Its confirmation lasts .42 seconds
+from contact, and the high kick can begin after .10 seconds of mid kick recovery.
 Timeout, taking damage, or starting another kind of attack clears the chain.
 A single buffered press cannot queue multiple stages. Follow-ups require a fresh
 R press near contact/recovery (input buffer 0.16 seconds).
 
-Front/high/very-high deal 1/2/3 damage. Front pushes 12px; high pushes 5px and
-launches at 90px/s; the critical finisher pushes 3px and launches at 120px/s.
-`FighterModel.launch` limits upward velocity using the remaining headroom below a 24px ground-relative ceiling, so repeated hits cannot stack launch height. Player jumps retain their own speed. High stuns for .70s, very-high for 1.2s. Launched victims remain hurt until both
+The mid kick deals 2 damage, pushes 5px, and launches at 90px/s. The high kick
+deals 3 damage, pushes 32px, and launches at 120px/s. The high kick's horizontal
+push decelerates to a stop over 220 ms and stops early at the arena boundary.
+`FighterModel.launch`
+limits repeated launches to 24px above ground. The mid kick stuns for .70s and
+the high kick stuns for 1.2s. Launched victims remain hurt until both
 the stun expires and they land. The runtime defaults to 6-health mosquitoes.
 
-`FighterCacheService` slices the three named sheets using their filename metadata.
+`FighterCacheService` slices both kick sheets using their filename metadata.
 `FighterAnimationHandler` maps startup, active and recovery to explicit poses:
 each kick reserves its final two loaded frames for contact; preceding frames
 provide windup and reversed recovery.
@@ -337,13 +346,33 @@ to `GameAudioService` immediately, including when multiple simulation steps happ
 in one rendered frame. The service observes ground movement for a separate walk
 loop; it does not mutate fighters. Sound completion never advances combat.
 
-`GameAudioPlayer` is adapted from CoolorBurn's tested `flame_audio_player.dart`,
-retaining pool initialization/start timeouts, retiring failed pools, direct SFX
-fallback, and late-player cleanup. It owns its cache and players per game instance.
-Logo and Lore share a music channel; footsteps have a separate looping channel.
-Generation checks cancel stale music/walk/SFX starts after screen changes.
-Tests explicitly inject `SilentAudioPlayer` or a recording fake so they do not
-access the real audio platform. See `docs/audio.md`.
+`GameAudioBackend` is the typed game boundary (`SoundCue`, `MusicCue`, walking
+intent and lifecycle). `GameAudioService` owns event routing; its backend remains
+private. `PlatformGameAudio` composes recorded music with an `EffectsBackend`.
+A conditional platform factory offers `MidiEffects` and `RecordedEffects` on web
+(default MIDI), and recorded effects on native. `SelectableEffects` owns switching,
+volume transfer, current walking intent, and cancellation of obsolete selection
+work. MIDI mode never preloads or plays recorded effect paths. Main Menu and
+Pause share a Flame **SFX MODE** button showing the selected MIDI/MP3 label.
+The mode survives screen and campaign replacement within the game instance. `GameSounds` maps
+FlutterGen paths only inside the recording adapters.
+
+`MidiEffects` owns cue selection and the single cancellable 360 ms footstep timer.
+`MidiNote` validates channel, program, pitch, velocity, duration and delay at
+runtime. `MidiSynth` isolates browser interop. `WebMidiSynth` owns one JS synth
+per game; `web/midi_synth.js` creates its AudioContext only after a user gesture,
+schedules a note-off for every note-on, bounds polyphony to 24 voices, and releases
+scheduled as well as sounding voices. Walking and one-shots stop independently.
+This original Web Audio renderer uses procedural square/saw and percussion
+patches, not OPL3/libADLMIDI or a sampled bank. It implements the GM slots used
+by the game, not a general MIDI-file player. See `docs/audio.md` for the patch map.
+
+`GameAudioPlayer` remains the internal recording transport, adapted from
+CoolorBurn. It owns recording cache/pools, fallback, late-player cleanup, and
+generation checks for cancelled music starts. Web uses it for Logo/Lore music and optional recorded effects;
+native composition retains the original effects. All resources belong
+to one game instance and are disposed by `PlatformGameAudio`.
+Headless tests inject `SilentAudioBackend` or recording fakes.
 
 ## Shared settings UI and CRT
 
@@ -357,8 +386,8 @@ pressed/disabled tint is applied. `CgaPalette` supplies colors only for drawn
 HUD, text and touch controls. Touch fills are opaque and direction/pause
 glyphs use integer pixel rectangles; empty health cells have cyan outlines.
 
-Volume callbacks update the real audio backend: music/walking channel gains
-change in place, including a pending start. SFX changes stop short voices and
+Volume callbacks update the real audio backend: music and MIDI walking gains
+change in place. The recording adapter also updates pending channel starts. SFX changes stop short voices and
 invalidate pending effects, then later requests use the new gain. Settings survive
 world and campaign replacement but are not persisted across app restarts.
 

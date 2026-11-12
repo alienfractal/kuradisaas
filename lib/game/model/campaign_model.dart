@@ -35,13 +35,17 @@ class CampaignModel {
   CampaignModel({List<LevelDefinition>? levels})
       : levels = List.unmodifiable(levels ??
             const [
-              LevelDefinition(title: 'NIGHT STREET / 01', enemyCount: 5),
               LevelDefinition(
-                  title: 'NIGHT STREET / 02', enemyCount: 7, veteranCount: 1),
+                  title: 'NIGHT STREET / 01', enemyCount: 6, gruntCount: 1),
+              LevelDefinition(
+                  title: 'NIGHT STREET / 02',
+                  enemyCount: 9,
+                  gruntCount: 2,
+                  veteranCount: 1),
               LevelDefinition(
                   title: 'NIGHT STREET / 03',
-                  enemyCount: 7,
-                  gruntCount: 2,
+                  enemyCount: 9,
+                  gruntCount: 4,
                   veteranCount: 3),
             ]) {
     if (this.levels.isEmpty ||

@@ -1,17 +1,17 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
+import 'package:kuradi_saased/audio/game_audio_backend.dart';
 import 'package:kuradi_saased/game/model/game_settings.dart';
 import 'package:kuradi_saased/game/view/settings_controls.dart';
 import 'package:kuradi_saased/gen/assets.gen.dart';
 import 'package:kuradi_saased/gamefsm/game_menu_fsm.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
 
-class SettingsAudio extends SilentAudioPlayer {
+class SettingsAudio extends SilentAudioBackend {
   double effects = -1, music = -1;
   @override
-  Future<void> setSoundFxVolume(double value) async {
+  Future<void> setEffectsVolume(double value) async {
     effects = value;
   }
 
@@ -85,6 +85,22 @@ void main() {
     expect(audio.music, 0);
     await tap(185);
     expect(game.settings.crtEnabled, isTrue);
+    final modeButton = game.world.children
+        .whereType<SettingsControls>()
+        .single
+        .children
+        .whereType<EffectsModeButton>()
+        .single;
+    expect(modeButton.label, 'MIDI');
+    final modePoint = game.camera.viewport.localToParent(Vector2(32, 107));
+    final cancelled =
+        await tester.startGesture(Offset(modePoint.x, modePoint.y));
+    await cancelled.cancel();
+    await tester.pump();
+    expect(audio.effectsMode, EffectsMode.midi);
+    await tap(107);
+    expect(audio.effectsMode, EffectsMode.mp3);
+    expect(modeButton.label, 'MP3');
 
     game.showLore();
     await tester.runAsync(() => game.ready());
@@ -102,6 +118,17 @@ void main() {
     await tester.pump();
     expect(game.world.children.whereType<SettingsControls>(), hasLength(1));
     final time = game.combat.player.stateTime;
+    expect(game.audio.effectsMode, EffectsMode.mp3);
+    final pausedMode = game.world.children
+        .whereType<SettingsControls>()
+        .single
+        .children
+        .whereType<EffectsModeButton>()
+        .single;
+    expect(pausedMode.label, 'MP3');
+    await tap(107);
+    expect(pausedMode.label, 'MIDI');
+    expect(audio.effectsMode, EffectsMode.midi);
     await tap(160);
     expect(audio.music, 1);
     await tap(185);

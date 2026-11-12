@@ -22,10 +22,8 @@ void main() {
       controls.kick();
       tick(.20);
       controls.kick();
-      tick(.30);
-      controls.kick();
       tick(.35);
-      expect(arena.hits, 3);
+      expect(arena.hits, 2);
       tick(.8);
       expect(peak, greaterThan(0));
       expect(peak, lessThanOrEqualTo(24));
@@ -40,7 +38,7 @@ void main() {
     var peak = 0.0;
     for (var hit = 0; hit < 8; hit++) {
       target.x = arena.player.x + 20;
-      arena.player.beginAttack(AttackSpec.veryHighKick);
+      arena.player.beginAttack(AttackSpec.highKick);
       for (var frame = 0; frame < 40; frame++) {
         arena.update(1 / 120, controls);
         if (target.elevation > peak) peak = target.elevation;
@@ -54,11 +52,7 @@ void main() {
     expect(target.airborne, isFalse);
   });
 
-  for (final spec in [
-    AttackSpec.frontKick,
-    AttackSpec.highKick,
-    AttackSpec.veryHighKick
-  ]) {
+  for (final spec in [AttackSpec.midKick, AttackSpec.highKick]) {
     for (final facing in [-1, 1]) {
       for (final gap in [0.0, .01, 20.0]) {
         test(
@@ -89,7 +83,9 @@ void main() {
           () {
         final arena = CombatLogicService(enemyCount: 1);
         final controls = InputService();
-        arena.player.facing = facing;
+        arena.player
+          ..x = 100
+          ..facing = facing;
         final target = arena.enemies.first
           ..x = arena.player.x + facing * spacing
           ..y = arena.player.y;
@@ -101,18 +97,26 @@ void main() {
 
         controls.kick();
         tick(.20);
-        expect(target.health, 5);
+        expect(arena.player.attack, AttackSpec.midKick);
+        expect(target.health, 4);
+        final beforeHeavyKick = target.x;
         controls.kick();
-        tick(.30);
+        for (var frame = 0; frame < 36 && arena.hits < 2; frame++) {
+          tick(1 / 120);
+        }
         expect(arena.player.attack, AttackSpec.highKick);
-        expect(target.health, 3);
-        controls.kick();
-        tick(.35);
-        expect(arena.player.attack, AttackSpec.veryHighKick);
-        expect(target.health, 0);
-        expect(arena.hits, 3);
-        expect(
-            arena.player.x, 80); // No movement needed to follow the pushback.
+        expect(target.health, 1);
+        expect(arena.hits, 2);
+        expect(target.x, beforeHeavyKick, reason: 'No snap on contact');
+        tick(.05);
+        final firstPush = (target.x - beforeHeavyKick) * facing;
+        expect(firstPush, inExclusiveRange(0, 32));
+        tick(.05);
+        final secondPush = (target.x - beforeHeavyKick) * facing - firstPush;
+        expect(secondPush, inExclusiveRange(0, firstPush));
+        tick(.2);
+        expect(target.x - beforeHeavyKick, closeTo(facing * 32, .001));
+        expect(arena.player.x, 100);
       });
     }
   }
@@ -124,7 +128,7 @@ void main() {
     }
   }
 
-  void front() {
+  void mid() {
     input.kick();
     advance(.20);
   }
@@ -134,10 +138,28 @@ void main() {
     advance(.30);
   }
 
-  void finisher() {
-    input.kick();
-    advance(.35);
-  }
+  test('lethal high kick still moves the victim up to the arena edge', () {
+    final arena = CombatLogicService(enemyCount: 1, enemyHealth: 3);
+    final controls = InputService();
+    final edge = arena.config.maxX;
+    final target = arena.enemies.single
+      ..x = edge - 16
+      ..y = arena.player.y;
+    arena.player
+      ..x = target.x - 20
+      ..beginAttack(AttackSpec.highKick)
+      ..enter(FighterState.active);
+
+    arena.update(1 / 120, controls);
+    expect(arena.won, isTrue);
+    expect(target.x, edge - 16);
+    arena.update(1 / 120, controls);
+    expect(target.x, inExclusiveRange(edge - 16, edge));
+    arena.update(.25, controls);
+    expect(target.x, edge);
+    arena.update(.25, controls);
+    expect(target.x, edge);
+  });
 
   setUp(() {
     combat = CombatLogicService(enemyCount: 1);
@@ -147,30 +169,78 @@ void main() {
       ..y = combat.player.y;
   });
 
-  test('three connected R presses use distinct attacks, damage and launches',
-      () {
-    final target = combat.enemies.first;
-    front();
-    expect(combat.player.attack, AttackSpec.frontKick);
+  for (final facing in [-1, 1]) {
+    test('a grounded punch and both kicks defeat a mosquito facing $facing',
+        () {
+      final player = combat.player..facing = facing;
+      final target = combat.enemies.single
+        ..x = player.x + facing * 25
+        ..y = player.y;
+
+      input.punch();
+      advance(.08);
+      expect(target.health, 5);
+      input.kick();
+      advance(.15);
+      expect(player.attack, AttackSpec.midKick);
+      expect(player.state, FighterState.startup);
+      advance(.20);
+      expect(target.health, 3);
+      high();
+      expect(player.attack, AttackSpec.highKick);
+      expect(target.state, FighterState.dead);
+      expect(combat.hits, 3);
+      expect(player.x, 80);
+    });
+  }
+
+  test('a missed punch cannot cancel recovery into a kick', () {
+    combat.enemies.single.x = 500;
+    input.punch();
+    advance(.10);
+    input.kick();
+    advance(.15);
+    expect(combat.player.attack, AttackSpec.punch);
+    expect(combat.player.state, FighterState.recovery);
+    advance(.15);
+    expect(combat.player.attackSerial, 1);
+  });
+
+  test('an airborne punch keeps its original push and recovery', () {
+    final target = combat.enemies.single;
+    input
+      ..jump()
+      ..punch();
+    advance(.10);
+    expect(combat.player.airborne, isTrue);
     expect(target.health, 5);
+    expect(target.x, 103 + AttackSpec.punch.knockback);
+    input.kick();
+    advance(.15);
+    expect(combat.player.attack, AttackSpec.punch);
+    expect(combat.player.state, FighterState.recovery);
+  });
+
+  test('two connected R presses launch and critically stun a mosquito', () {
+    final target = combat.enemies.first;
+    mid();
+    expect(combat.player.attack, AttackSpec.midKick);
+    expect(target.health, 4);
     expect(target.x - combat.player.x, lessThan(AttackSpec.highKick.reach));
-    high();
-    expect(combat.player.attack, AttackSpec.highKick);
-    expect(target.health, 3);
     expect(target.airborne, isTrue);
     expect(target.state, FighterState.hurt);
-    finisher();
-    expect(combat.player.attack, AttackSpec.veryHighKick);
-    expect(combat.player.attackSerial, 3);
-    expect(combat.hits, 3);
-    expect(target.health, 0);
-    expect(target.state, FighterState.dead);
+    high();
+    expect(combat.player.attack, AttackSpec.highKick);
+    expect(combat.player.attackSerial, 2);
+    expect(combat.hits, 2);
+    expect(target.health, 1);
+    expect(target.state, FighterState.hurt);
     expect(target.lastHitCritical, isTrue);
     expect(target.verticalVelocity, greaterThan(0));
     advance(2);
-    expect(combat.hits, 3);
+    expect(combat.hits, 2);
     expect(target.airborne, isFalse);
-    expect(target.state, FighterState.dead);
+    expect(target.alive, isTrue);
   });
 
   test('surviving critical victim stays stunned after landing then recovers',
@@ -179,10 +249,9 @@ void main() {
     final target = combat.enemies.first
       ..x = 103
       ..y = combat.player.y;
-    front();
+    mid();
     high();
-    finisher();
-    expect(target.health, 4);
+    expect(target.health, 5);
     expect(target.lastHitCritical, isTrue);
     final serial = target.attackSerial;
     advance(1.0);
@@ -193,9 +262,9 @@ void main() {
     expect(target.state, isNot(FighterState.hurt));
   });
 
-  test('missed front kick cannot advance or cancel its recovery', () {
+  test('missed mid kick cannot advance or cancel its recovery', () {
     combat.enemies.first.x = 500;
-    front();
+    mid();
     input.kick();
     advance(.3);
     expect(combat.player.attackSerial, 1);
@@ -203,22 +272,23 @@ void main() {
     advance(.3);
     input.kick();
     advance(.01);
-    expect(combat.player.attack, AttackSpec.frontKick);
+    expect(combat.player.attack, AttackSpec.midKick);
   });
 
   test('expired confirmation resets the chain', () {
-    front();
+    mid();
     // Isolate combo expiry from the close target's next sting.
     combat.enemies.first.hitStunDuration = 2;
     advance(.6);
     expect(combat.player.comboReady, isFalse);
     input.kick();
     advance(.01);
-    expect(combat.player.attack, AttackSpec.frontKick);
+    expect(combat.player.attack, AttackSpec.midKick);
     expect(combat.player.attackSerial, 2);
   });
 
-  test('high kick must hit the same victim to unlock the finisher', () {
+  test('mid kick after a punch must hit the same victim to unlock high kick',
+      () {
     combat = CombatLogicService(enemyCount: 2);
     final original = combat.enemies[0]
       ..x = 103
@@ -226,12 +296,13 @@ void main() {
     final other = combat.enemies[1]
       ..x = 500
       ..y = combat.player.y;
-    front();
-    advance(.06); // Let the front kick leave its active phase first.
+    input.punch();
+    advance(.18);
     original.x = 500;
     other.x = 110;
-    high();
-    expect(combat.player.attack, AttackSpec.highKick);
+    input.kick();
+    advance(.35);
+    expect(combat.player.attack, AttackSpec.midKick);
     expect(other.health, 4);
     expect(combat.player.comboReady, isFalse);
     input.kick();
@@ -240,11 +311,11 @@ void main() {
     advance(.2);
     input.kick();
     advance(.01);
-    expect(combat.player.attack, AttackSpec.frontKick);
+    expect(combat.player.attack, AttackSpec.midKick);
   });
 
   test('taking damage clears confirmation and buffered follow-up', () {
-    front();
+    mid();
     final attacker = combat.enemies.first
       ..x = combat.player.x + 10
       ..invulnerability = 0
@@ -255,7 +326,7 @@ void main() {
     expect(combat.player.state, FighterState.hurt);
     expect(combat.player.comboReady, isFalse);
     expect(combat.player.bufferedAttack, isNull);
-    expect(attacker.health, 5);
+    expect(attacker.health, 4);
   });
 
   test('an early repeated R expires instead of queuing an entire combo', () {

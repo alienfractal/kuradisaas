@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kuradi_saased/kuradi_saased.dart';
-import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
+import 'package:kuradi_saased/audio/game_audio_backend.dart';
 import 'package:kuradi_saased/game/view/game_controls_overlay.dart';
 import 'package:kuradi_saased/gamefsm/game_menu_fsm.dart';
 
@@ -11,7 +11,7 @@ void main() {
   testWidgets(
       'E/R/Space and touch controls produce the matching one-shot intent',
       (tester) async {
-    final game = KuradiSaased(audioPlayer: SilentAudioPlayer());
+    final game = KuradiSaased(audioPlayer: SilentAudioBackend());
     await tester.runAsync(() async {
       game.onGameResize(Vector2(800, 600));
       // ignore: invalid_use_of_internal_member

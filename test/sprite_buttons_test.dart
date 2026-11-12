@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kuradi_saased/audio/audio_player_wrapper.dart';
+import 'package:kuradi_saased/audio/game_audio_backend.dart';
 import 'package:kuradi_saased/game/states/main_menu/views/lore_view.dart';
 import 'package:kuradi_saased/game/states/main_menu/views/main_menu_view.dart';
 import 'package:kuradi_saased/game/states/pause/views/pause_view.dart';
@@ -65,7 +65,7 @@ void main() {
 
   testWidgets('cached sprite buttons cancel, disable and route through the FSM',
       (tester) async {
-    final game = KuradiSaased(audioPlayer: SilentAudioPlayer());
+    final game = KuradiSaased(audioPlayer: SilentAudioBackend());
     await tester.runAsync(() async {
       await tester.pumpWidget(MaterialApp(home: GameWidget(game: game)));
       await game.loaded;

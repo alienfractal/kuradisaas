@@ -14,15 +14,15 @@ Images originate from the user's existing GameMaker sprite frames from:
 
 Current runtime animations use horizontal sheets:
 
-- `jann_idle_80x99-4.png`: Jaan idle.
-- `jann_walk_92x99-8.png`: Jaan walk.
-- `jaan_punch_108x98-4.png`: Jaan punch.
-- `jaan_jump_61x99-5.png`: Jaan jump.
+- `new-jan-animationwalking-46x58-7.png`: Jaan walk.
+- `new-jan-mpunch-46x58-5.png`: Jaan punch and idle stance.
+- `new-jan-animation-jump-46x58-2.png`: Jaan jump.
 - `spr_mosquito_96x96-4.png`: mosquito flying.
 
-Idle, walk and punch were supplied with 61x99 suffixes; those filenames were
-corrected to match their actual PNG cell dimensions without resizing the art.
-The replaced individual frames are archived in `art/`.
+Idle uses the opening stance from the punch sheet. The walk and jump sheets'
+alpha-1 backgrounds are cleared at load time. The jump uses the first frame at
+takeoff and near landing, and the second through the middle of the arc. The
+previous strips and the individual frames in `art/` are reference exports.
 
 Left-facing presentation mirrors the right-facing frames. PNG transparency is
 preserved. The original archives and source images are untouched.
@@ -39,9 +39,9 @@ ScenarioSheet reads the WIDTHxHEIGHT-FRAMES filename suffix. All original PNGs
 are unchanged; black is drawn in code behind the transparent layers.
 
 
-Fighter presentation normalizes Jaan's mostly 4x4 source-pixel blocks at 1/4
-scale and mosquito 3x3 blocks at 1/3 scale, rounded to whole game pixels. This
-replaces the common half-size rendering, which gave them mismatched pixel grids.
+Jaan's frames draw at native size. The 46x58 cells place the foot line 12 pixels
+above the bottom, so the renderer aligns that line with the ground. Regular
+and veteran mosquito flight frames draw at 32x32 game pixels.
 
 
 CGA-game-intro-logos_256x256-2.png contains two horizontal 256x256 menu frames:
@@ -49,30 +49,15 @@ the title/input prompt, then the Alien Retro Games logo. Both use native-size
 presentation without stretching or automatic sprite animation.
 
 
-Jump uses the five-frame sheet listed above. The older nine
-jann_kick2_right exports are now in `art/`; combat uses the three kick sheets
-described below. Current kick cells are native 24x24 game pixels and render 1:1.
-
-
-
-Three-stage kicks use `jann_low_kick_24x24-6.png`,
-`jann_frontal_kick_24x24-7.png`, and
-`jann_high_kick_24x24-7.png`, in that order for 1/2/3 damage. Existing combat
-IDs `frontKick`, `highKick`, `veryHighKick` retain their timing and hit effects.
-The suffix declares cell dimensions and
-frame count; the cache validates the image and slices horizontally. No blank
-leading cells. Original source PNGs and archived individual kick frames remain
-unchanged. The FSM chooses startup/impact/recovery poses from each sheet:
-low has six frames: wind up through 0-3, contact on 4-5, and retract through 3-0.
-Frontal/high have seven frames: wind up through 0-4, contact on 5-6, and
-retract through 4-0. The handler derives these poses from the loaded count,
-reserving the final two frames for contact. Combat timings are independent of
-frame count. When re-exporting, keep the filename's frame-count suffix accurate
+The two kicks use `new-jan-mkick-46x58-3.png` and `new-jan-hkick-46x58-5.png`
+for 2 and 3 damage respectively. The cache validates the horizontal cells
+using dimensions and frame count from the filename. Both kicks use their final
+two frames for contact and reverse the
+windup during recovery. Punch uses frames 0–1 for windup, 2–3 for contact,
+and 4–1–0 for recovery. The death sequences use 24x24 cells. Combat timings are independent of frame
+count. When re-exporting, keep the filename's frame-count suffix accurate
 and regenerate FlutterGen references with `flutter pub run build_runner build`.
-Renaming a sheet updates metadata only; do not resize artwork to match a stale
-suffix. Restart a running game after replacing cached sprite assets.
-The current frontal stage loads `jann_frontal_kick_24x24-7.png`; the older
-similarly named `jann_front_kick_24x24-7.png` export has been removed.
+Restart a running game after replacing cached sprite assets.
 
 ## Mosquito reactions
 
@@ -105,13 +90,21 @@ keeps that choice for the full sequence and final pose.
 
 ## Sound assets
 
-`resources/sound/` is bundled by pubspec.yaml. Current assignments:
+`resources/sound/` is bundled by pubspec.yaml. Recorded assignments:
 `alien_retro_logo_mfx.ogg` (opening one-shot), `alien_retro_intro.ogg` (Lore loop),
 `sfx_jaan_jump_1.wav` (accepted takeoff), `sfx_kurat_jaan_walk.ogg` (walking loop),
 `blockHit1.mp3` (attack start), `blockHit2.mp3` (enemy contact), and `blockHit3.mp3`
 (damage to Jaan). Other imported tracks/jump variants are unassigned.
 Walking plays at 1.3x speed; music and other effects retain their normal rate.
-Original sound files and codecs are preserved.
+Original sound files and codecs are preserved. In MIDI mode, web uses only the two music
+recordings at runtime. Its effects and footsteps use authored MIDI note
+phrases in `lib/audio/midi/midi_cues.dart`, rendered by the original procedural
+patches in `web/midi_synth.js`. There is no bank, WASM binary or third-party
+synthesizer to bundle or license. The JS file is copied by Flutter's web build,
+loaded relative to the application base URL, and needs no FlutterGen entry.
+The existing effect assets support the selectable MP3 mode on web and the
+native recording adapter;
+no generated asset names or source recordings changed.
 
 ## Shared settings art and shader
 
@@ -128,29 +121,26 @@ pubspec's shaders, compiled by Flutter, and applied only while CRT is enabled.
 All original sprite art stays unchanged.
 
 
-## Level 3 mosquito grunts
+## Mosquito grunts
 
-Idle and attacks use the three
-`mosquito-grunt-animation-{idle,light-attack,heavy-attack}-small-47x58-*.png`
-exports through FlutterGen: 7 idle frames and 4 frames per attack. They face
-left and render at the filename's 47x58 frame dimensions without component
-downscaling. The cache reads width, height and frame count from the suffix.
-Idle already matches that layout. The attack exports are 190x59 and 760x236;
-the cache fits their four complete frames to the declared 47x58 cells once at
-load time using nearest-neighbor sampling. This avoids rejecting the exports
-or cropping their frames. Pure green background pixels become transparent;
-source PNGs are unchanged. Older idle/attack exports are not loaded.
+Grunts use `grunt-idle-47x58-7.png`,
+`grunt-attack-light-47x58-4.png`, `grunt-attack-heavy-47x58-4.png`,
+`grunt-mosquito-dead-47x58-7.png` and `grunt-fatal-47x58-15.png` through FlutterGen.
+All five sheets face left and draw at their native frame sizes. Idle, knockdown,
+and fatal frames are 47x58. The 190x58 light attack sheet is divided at whole
+pixel boundaries into 48, 47, 48, and 47px wide frames. The 188x59 heavy attack
+sheet has four 47x59 frames.
+It clears the alpha-1 background on the knockdown and fatal sheets. The source
+PNGs are preserved.
 
-`mosquito-grunt-ko-95x119-7.png` (665x119) and
-`mosquito-grunt-death1-95x119-12.png` (1140x119) retain their existing 32x40 prepared
-frame size and preserve their exported transparency. Ordinary hits sample the
-first three KO frames over .25s. A surviving critical finisher plays all seven
-KO frames over .56s, holds the fallen pose, then reverses them during the final
-.35s of the existing 1.2s stun to stand up. Lethal hits play the 12-frame death
-once over .96s; the final pose holds until the death window ends and the entity
-is hidden. The old rotated-idle death placeholder is removed.
-Jaan's temporary knockdown plays the fall death sheet, holds on the ground,
-and reverses the same seven frames to stand up. Lethal hits retain actual death.
+Ordinary hits sample the first three knockdown frames over .25s. A surviving
+critical finisher plays all seven frames over .56s, holds the fallen pose,
+then reverses them during the final .35s of the 1.2s stun. Lethal hits play all
+15 fatal frames over .96s and hold the final pose until the entity is hidden.
+Jaan's temporary knockdown uses `new-jan-animationko-48x56-6.png`. The PNG is
+276x58, so the cache slices six native 46x58 frames and clears the alpha-1
+background. Jaan falls, holds the last pose on the ground, then plays the
+same frames in reverse to stand up.
 
 
 ## Veteran marker
@@ -158,5 +148,5 @@ and reverses the same seven frames to stand up. Lethal hits retain actual death.
 Level 2 promotes one random small mosquito to veteran rank; level 3 promotes three. `MosquitoEntity`
 draws a five-by-five yellow pixel asterisk on a black backing beside its health
 bar while alive, following elevation during launches. The marker uses native
-game pixels and needs no new sprite or font glyph. Veteran flight/reaction
-artwork and health match ordinary mosquitoes; only sting windup/recovery differ.
+game pixels and needs no new sprite or font glyph. Veterans share their flight
+and reaction artwork with ordinary mosquitoes.
